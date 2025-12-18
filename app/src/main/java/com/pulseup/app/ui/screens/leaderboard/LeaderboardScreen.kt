@@ -3,11 +3,8 @@ package com.pulseup.app.ui.screens.leaderboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,25 +14,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.pulseup.app.data.repository.LeaderboardUser
 import com.pulseup.app.ui.theme.*
+import com.pulseup.app.viewmodel.LeaderboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LeaderboardScreen() {
+fun LeaderboardScreen(
+    viewModel: LeaderboardViewModel = viewModel()
+) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("This Week", "All Time")
 
-    // Sample leaderboard data
-    val leaderboardData = List(10) { index ->
-        LeaderboardItemData(
-            rank = index + 4,
-            username = "User ${index + 4}",
-            points = 2500 - (index * 200),
-            level = 5 - (index / 3),
-            streak = 7 - index,
-            isCurrentUser = index == 2
-        )
-    }
+    // Ambil data dari ViewModel
+    val users by viewModel.users.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
         topBar = {
@@ -77,45 +71,71 @@ fun LeaderboardScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Top 3 Podium
-            TopThreePodium()
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Leaderboard List
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(leaderboardData) { item ->
-                    LeaderboardItem(
-                        rank = item.rank,
-                        username = item.username,
-                        points = item.points,
-                        level = item.level,
-                        streak = item.streak,
-                        isCurrentUser = item.isCurrentUser
-                    )
+            // Loading indicator
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = PrimaryPurple)
                 }
-                item { Spacer(modifier = Modifier.height(16.dp)) }
+            } else if (users.isEmpty()) {
+                // Empty state
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "No users yet",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = TextSecondaryLight
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Be the first to add an activity!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondaryLight
+                        )
+                    }
+                }
+            } else {
+                // Top 3 Podium
+                if (users.size >= 3) {
+                    TopThreePodium(users = users.take(3))
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+
+                // Leaderboard List
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(users.size) { index ->
+                        val user = users[index]
+                        LeaderboardItem(
+                            rank = index + 1,
+                            username = user.username,
+                            points = user.totalPoints,
+                            level = user.level,
+                            streak = user.currentStreak,
+                            isCurrentUser = user.userId == "1"
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                }
             }
         }
     }
 }
 
-data class LeaderboardItemData(
-    val rank: Int,
-    val username: String,
-    val points: Int,
-    val level: Int,
-    val streak: Int,
-    val isCurrentUser: Boolean
-)
-
 @Composable
-fun TopThreePodium() {
+fun TopThreePodium(users: List<LeaderboardUser>) {
+    // Ensure we have at least 3 users
+    if (users.size < 3) return
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -126,8 +146,8 @@ fun TopThreePodium() {
         // 2nd Place
         PodiumCard(
             rank = 2,
-            username = "Sarah M.",
-            points = 2800,
+            username = users.getOrNull(1)?.username ?: "User 2",
+            points = users.getOrNull(1)?.totalPoints ?: 0,
             height = 120.dp,
             color = Color(0xFFC0C0C0) // Silver
         )
@@ -135,8 +155,8 @@ fun TopThreePodium() {
         // 1st Place
         PodiumCard(
             rank = 1,
-            username = "John D.",
-            points = 3500,
+            username = users.getOrNull(0)?.username ?: "User 1",
+            points = users.getOrNull(0)?.totalPoints ?: 0,
             height = 160.dp,
             color = Color(0xFFFFD700) // Gold
         )
@@ -144,8 +164,8 @@ fun TopThreePodium() {
         // 3rd Place
         PodiumCard(
             rank = 3,
-            username = "Mike R.",
-            points = 2400,
+            username = users.getOrNull(2)?.username ?: "User 3",
+            points = users.getOrNull(2)?.totalPoints ?: 0,
             height = 100.dp,
             color = Color(0xFFCD7F32) // Bronze
         )
