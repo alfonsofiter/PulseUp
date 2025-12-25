@@ -16,9 +16,14 @@ import androidx.navigation.navArgument
 import com.pulseup.app.ui.components.PulseUpBottomBar
 import com.pulseup.app.ui.screens.activities.ActivitiesScreen
 import com.pulseup.app.ui.screens.activities.AddActivityScreen
+import com.pulseup.app.ui.screens.auth.LoginScreen
+import com.pulseup.app.ui.screens.auth.SignUpScreen
+import com.pulseup.app.ui.screens.bmi.BMICalculatorScreen
 import com.pulseup.app.ui.screens.dashboard.DashboardScreen
 import com.pulseup.app.ui.screens.leaderboard.LeaderboardScreen
+import com.pulseup.app.ui.screens.profile.EditProfileScreen
 import com.pulseup.app.ui.screens.profile.ProfileScreen
+import com.pulseup.app.ui.screens.profile.SettingsScreen
 import com.pulseup.app.ui.theme.PulseUpTheme
 
 class MainActivity : ComponentActivity() {
@@ -38,7 +43,6 @@ fun PulseUpApp() {
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
-    // Screen yang punya bottom navigation
     val screensWithBottomBar = listOf(
         Screen.Dashboard.route,
         Screen.Activities.route,
@@ -53,13 +57,10 @@ fun PulseUpApp() {
                     selectedRoute = currentRoute ?: Screen.Dashboard.route,
                     onNavigate = { route ->
                         navController.navigate(route) {
-                            // Pop up to start destination
                             popUpTo(Screen.Dashboard.route) {
                                 saveState = true
                             }
-                            // Avoid multiple copies
                             launchSingleTop = true
-                            // Restore state when reselecting
                             restoreState = true
                         }
                     }
@@ -69,9 +70,37 @@ fun PulseUpApp() {
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Dashboard.route,
+            startDestination = Screen.Login.route,
             modifier = Modifier.padding(paddingValues)
         ) {
+            // Login Screen
+            composable(Screen.Login.route) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    },
+                    onSignUpClick = {
+                        navController.navigate(Screen.SignUp.route)
+                    }
+                )
+            }
+
+            // Sign Up Screen
+            composable(Screen.SignUp.route) {
+                SignUpScreen(
+                    onSignUpSuccess = {
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    },
+                    onLoginClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
             // Dashboard
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
@@ -93,7 +122,7 @@ fun PulseUpApp() {
             // Add Activity
             composable(Screen.AddActivity.route) {
                 AddActivityScreen(
-                    activityId = null, // null = Add mode
+                    activityId = null,
                     onNavigateBack = {
                         navController.popBackStack()
                     }
@@ -111,7 +140,7 @@ fun PulseUpApp() {
             ) { backStackEntry ->
                 val activityId = backStackEntry.arguments?.getInt("activityId") ?: 0
                 AddActivityScreen(
-                    activityId = activityId, // Pass ID untuk edit
+                    activityId = activityId,
                     onNavigateBack = {
                         navController.popBackStack()
                     }
@@ -123,9 +152,54 @@ fun PulseUpApp() {
                 LeaderboardScreen()
             }
 
+            // BMI Calculator
+            composable(Screen.BMICalculator.route) {
+                BMICalculatorScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
             // Profile
             composable(Screen.Profile.route) {
-                ProfileScreen()
+                ProfileScreen(
+                    onLogout = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) {
+                                inclusive = true
+                            }
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToBMI = {
+                        navController.navigate(Screen.BMICalculator.route)
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route)
+                    }
+                )
+            }
+
+            // Settings
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onNavigateToEditProfile = {
+                        navController.navigate(Screen.EditProfile.route)
+                    }
+                )
+            }
+
+            // Edit Profile
+            composable(Screen.EditProfile.route) {
+                EditProfileScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
             }
         }
     }

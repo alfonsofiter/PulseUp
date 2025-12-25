@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,21 +18,60 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pulseup.app.ui.components.*
 import com.pulseup.app.ui.theme.*
+import com.pulseup.app.viewmodel.ProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen() {
-    var showBMIDialog by remember { mutableStateOf(false) }
+fun ProfileScreen(
+    onLogout: () -> Unit = {},
+    onNavigateToBMI: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    viewModel: ProfileViewModel = viewModel()
+) {
+    val state by viewModel.profileState.collectAsState()
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    // Dialog Konfirmasi Logout
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Keluar dari Akun") },
+            text = { Text("Apakah Anda yakin ingin keluar?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                        onLogout()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = ErrorRed)
+                ) {
+                    Text("Keluar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Batal")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Profile") },
                 actions = {
-                    IconButton(onClick = { /* Settings */ }) {
-                        Icon(Icons.Default.Settings, "Settings")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showLogoutDialog = true }) {
+                            Icon(Icons.AutoMirrored.Filled.Logout, "Logout", tint = Color.White)
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, "Settings", tint = Color.White)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -75,14 +115,18 @@ fun ProfileScreen() {
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Nama User Dinamis
                     Text(
-                        "John Doe",
+                        state.user?.username ?: "User",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+                    
+                    // Email User Dinamis
                     Text(
-                        "john.doe@example.com",
+                        state.firebaseEmail ?: "user@example.com",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f)
                     )
@@ -92,6 +136,7 @@ fun ProfileScreen() {
             Spacer(modifier = Modifier.height(16.dp))
 
             // Level Progress
+            val user = state.user
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -104,8 +149,8 @@ fun ProfileScreen() {
                         .padding(16.dp)
                 ) {
                     LevelProgressBar(
-                        currentLevel = 5,
-                        progress = 65f
+                        currentLevel = user?.level ?: 1,
+                        progress = user?.getProgressToNextLevel() ?: 0f
                     )
                 }
             }
@@ -129,12 +174,12 @@ fun ProfileScreen() {
             ) {
                 StatCardSmall(
                     title = "Total Points",
-                    value = "2,500",
+                    value = "${user?.totalPoints ?: 0}",
                     modifier = Modifier.weight(1f)
                 )
                 StatCardSmall(
                     title = "Activities",
-                    value = "127",
+                    value = "${state.totalActivities}",
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -149,12 +194,12 @@ fun ProfileScreen() {
             ) {
                 StatCardSmall(
                     title = "Current Streak",
-                    value = "7 days 🔥",
+                    value = "${user?.currentStreak ?: 0} days 🔥",
                     modifier = Modifier.weight(1f)
                 )
                 StatCardSmall(
                     title = "Longest Streak",
-                    value = "21 days",
+                    value = "${user?.longestStreak ?: 0} days",
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -169,7 +214,8 @@ fun ProfileScreen() {
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = InfoBlue.copy(alpha = 0.1f)
-                )
+                ),
+                onClick = onNavigateToBMI
             ) {
                 Row(
                     modifier = Modifier
@@ -186,25 +232,28 @@ fun ProfileScreen() {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Height: 170 cm • Weight: 65 kg",
+                            "Height: ${user?.height?.toInt() ?: 0} cm • Weight: ${user?.weight?.toInt() ?: 0} kg",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondaryLight
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        
+                        val bmi = user?.calculateBMI() ?: 0f
+                        val bmiFormatted = "%.1f".format(bmi)
+                        val category = user?.getBMICategory() ?: "Unknown"
+                        
                         Text(
-                            "BMI: 22.5 (Normal)",
+                            "BMI: $bmiFormatted ($category)",
                             style = MaterialTheme.typography.titleMedium,
                             color = SuccessGreen,
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    IconButton(onClick = { showBMIDialog = true }) {
-                        Icon(
-                            Icons.Default.Calculate,
-                            "Calculate BMI",
-                            tint = InfoBlue
-                        )
-                    }
+                    Icon(
+                        Icons.Default.Calculate,
+                        "Calculate BMI",
+                        tint = InfoBlue
+                    )
                 }
             }
 
@@ -233,20 +282,17 @@ fun ProfileScreen() {
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    Text(
-                        "💡 Your activity level is great! Try to maintain your 7-day streak.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "💧 Remember to drink more water today. You're at 6/8 glasses.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "🏃 Consider adding 15 more minutes of exercise to reach your weekly goal!",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    val tips = viewModel.generateAITips()
+                    tips.forEach { tip ->
+                        Text(
+                            tip,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                    if (tips.isEmpty()) {
+                        Text("Add some activities to get AI tips!")
+                    }
                 }
             }
 
@@ -266,17 +312,19 @@ fun ProfileScreen() {
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(5) { index ->
+                items(state.badges.size) { index ->
+                    val badge = state.badges[index]
+                    val isUnlocked = state.achievements.any { it.badgeId == badge.id }
                     BadgeCard(
-                        emoji = listOf("🏃", "💧", "🥗", "🔥", "👣")[index],
-                        name = listOf("Marathon Runner", "Hydration Hero", "Nutrition Master", "Week Warrior", "First Step")[index],
-                        description = "Completed",
-                        isUnlocked = index < 3
+                        emoji = badge.icon,
+                        name = badge.name,
+                        description = if (isUnlocked) "Completed" else "Locked",
+                        isUnlocked = isUnlocked
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(80.dp))
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }

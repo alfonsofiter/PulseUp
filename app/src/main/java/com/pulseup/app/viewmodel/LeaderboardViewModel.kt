@@ -8,6 +8,7 @@ import com.pulseup.app.data.repository.LeaderboardUser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class LeaderboardViewModel(application: Application) : AndroidViewModel(application) {
@@ -33,20 +34,21 @@ class LeaderboardViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             _isLoading.value = true
 
-            try {
-                firebaseRepo.getLeaderboard().collect { userList ->
+            firebaseRepo.getLeaderboard()
+                .catch { e ->
+                    e.printStackTrace()
+                    _isLoading.value = false
+                }
+                .collect { userList ->
                     _users.value = userList
 
                     // Find current user rank
                     val rank = userList.indexOfFirst { it.userId == currentUserId.toString() } + 1
                     _currentUserRank.value = if (rank <= 0) 0 else rank
 
+                    // FIXED: Always set loading to false after data is received (even if empty)
                     _isLoading.value = false
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _isLoading.value = false
-            }
         }
     }
 

@@ -106,6 +106,7 @@ dependencies {
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-database-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx") // Added Firebase Auth
 
     // Testing
     testImplementation("junit:junit:4.13.2")

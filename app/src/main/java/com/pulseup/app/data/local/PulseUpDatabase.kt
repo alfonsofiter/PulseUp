@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.pulseup.app.data.local.dao.*
 import com.pulseup.app.data.local.entity.*
@@ -19,7 +20,7 @@ import kotlinx.coroutines.launch
         Badge::class,
         Achievement::class
     ],
-    version = 1,
+    version = 2, // Migrasi ke versi 2 karena ada field baru di User
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -41,6 +42,7 @@ abstract class PulseUpDatabase : RoomDatabase() {
                     PulseUpDatabase::class.java,
                     "pulseup_database"
                 )
+                    .fallbackToDestructiveMigration() // Cara tercepat untuk development agar tidak foreclose
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
@@ -53,7 +55,6 @@ abstract class PulseUpDatabase : RoomDatabase() {
                 super.onCreate(db)
                 INSTANCE?.let { database ->
                     CoroutineScope(Dispatchers.IO).launch {
-                        // Insert predefined badges saat database dibuat
                         database.badgeDao().insertBadges(PredefinedBadges.badges)
                     }
                 }

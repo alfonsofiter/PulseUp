@@ -12,6 +12,9 @@ data class User(
     val age: Int,
     val weight: Float, // dalam kg
     val height: Float, // dalam cm
+    val phoneNumber: String = "",
+    val dateOfBirth: Long = 0L,
+    val profilePictureUrl: String = "",
     val totalPoints: Int = 0,
     val level: Int = 1,
     val currentStreak: Int = 0,
@@ -20,6 +23,7 @@ data class User(
 ) {
     // Hitung BMI
     fun calculateBMI(): Float {
+        if (height == 0f) return 0f
         val heightInMeters = height / 100
         return weight / (heightInMeters * heightInMeters)
     }
@@ -37,9 +41,8 @@ data class User(
 
     // Progress ke level berikutnya
     fun getProgressToNextLevel(): Float {
-        val pointsForCurrentLevel = (level - 1) * 500
         val pointsForNextLevel = level * 500
-        val pointsInCurrentLevel = totalPoints - pointsForCurrentLevel
-        return (pointsInCurrentLevel.toFloat() / 500f) * 100f
+        val pointsInCurrentLevel = totalPoints % 500
+        return (pointsInCurrentLevel.toFloat() / 500f)
     }
 }

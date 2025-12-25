@@ -23,19 +23,61 @@ import com.pulseup.app.ui.theme.*
 import com.pulseup.app.viewmodel.ActivitiesViewModel
 import kotlinx.coroutines.launch
 
+/**
+ * Pilihan aktivitas untuk kategori EXERCISE
+ */
+val EXERCISE_OPTIONS = listOf("Berjalan", "Berlari", "Bersepeda", "Mendaki")
+
+/**
+ * Pilihan aktivitas untuk kategori HYDRATION
+ */
+val HYDRATION_OPTIONS = listOf("Minum Air")
+
+/**
+ * Pilihan aktivitas untuk kategori NUTRITION
+ */
+val NUTRITION_OPTIONS = listOf(
+    "Sarapan (Breakfast)",
+    "Makan Siang (Lunch)",
+    "Makan Malam (Dinner)",
+    "Minuman Berkalori (Beverage)",
+    "Suplemen (Supplement)"
+)
+
+/**
+ * Pilihan aktivitas untuk kategori SLEEP
+ */
+val SLEEP_OPTIONS = listOf("Tidur Malam (Night Sleep)", "Tidur Siang (Nap)")
+
+/**
+ * Pilihan kualitas tidur
+ */
+val SLEEP_QUALITY_OPTIONS = listOf(
+    "Sangat Baik (Excellent)",
+    "Baik (Good)",
+    "Cukup (Fair)",
+    "Kurang (Poor)",
+    "Buruk (Very Poor)"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddActivityScreen(
-    activityId: Int? = null, // null = Add mode, not null = Edit mode
+    activityId: Int? = null,
     onNavigateBack: () -> Unit,
     viewModel: ActivitiesViewModel = viewModel()
 ) {
     var selectedCategory by remember { mutableStateOf(ActivityCategory.EXERCISE) }
     var activityName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var duration by remember { mutableStateOf("") }
+    var durationOrVolume by remember { mutableStateOf("") }
+    var sleepQuality by remember { mutableStateOf(SLEEP_QUALITY_OPTIONS[1]) } // Default: Baik
     var isLoading by remember { mutableStateOf(false) }
     var isLoadingData by remember { mutableStateOf(activityId != null) }
+
+    // Dropdown state
+    var expandedName by remember { mutableStateOf(false) }
+    var expandedQuality by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val isEditMode = activityId != null
@@ -49,10 +91,21 @@ fun AddActivityScreen(
                     selectedCategory = it.category
                     activityName = it.activityName
                     description = it.description
-                    duration = it.duration.toString()
+                    durationOrVolume = it.duration.toString()
                 }
                 isLoadingData = false
             }
+        }
+    }
+
+    // Update activity name when category changes
+    LaunchedEffect(selectedCategory) {
+        activityName = when(selectedCategory) {
+            ActivityCategory.EXERCISE -> EXERCISE_OPTIONS.first()
+            ActivityCategory.HYDRATION -> HYDRATION_OPTIONS.first()
+            ActivityCategory.NUTRITION -> NUTRITION_OPTIONS.first()
+            ActivityCategory.SLEEP -> SLEEP_OPTIONS.first()
+            else -> ""
         }
     }
 
@@ -101,165 +154,126 @@ fun AddActivityScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Exercise
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(100.dp),
-                        onClick = { selectedCategory = ActivityCategory.EXERCISE },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (selectedCategory == ActivityCategory.EXERCISE)
-                                ExerciseColor.copy(alpha = 0.2f) else CardBackground
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("🏃", style = MaterialTheme.typography.displaySmall)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Exercise",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = if (selectedCategory == ActivityCategory.EXERCISE)
-                                    FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-
-                    // Hydration
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(100.dp),
-                        onClick = { selectedCategory = ActivityCategory.HYDRATION },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (selectedCategory == ActivityCategory.HYDRATION)
-                                HydrationColor.copy(alpha = 0.2f) else CardBackground
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("💧", style = MaterialTheme.typography.displaySmall)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Hydration",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = if (selectedCategory == ActivityCategory.HYDRATION)
-                                    FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-
-                    // Nutrition
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(100.dp),
-                        onClick = { selectedCategory = ActivityCategory.NUTRITION },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (selectedCategory == ActivityCategory.NUTRITION)
-                                NutritionColor.copy(alpha = 0.2f) else CardBackground
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("🍎", style = MaterialTheme.typography.displaySmall)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Nutrition",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = if (selectedCategory == ActivityCategory.NUTRITION)
-                                    FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-
-                    // Sleep
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(100.dp),
-                        onClick = { selectedCategory = ActivityCategory.SLEEP },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (selectedCategory == ActivityCategory.SLEEP)
-                                SleepColor.copy(alpha = 0.2f) else CardBackground
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("😴", style = MaterialTheme.typography.displaySmall)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Sleep",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = if (selectedCategory == ActivityCategory.SLEEP)
-                                    FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
+                    CategoryItem(
+                        icon = "🏃",
+                        label = "Exercise",
+                        category = ActivityCategory.EXERCISE,
+                        selectedCategory = selectedCategory,
+                        color = ExerciseColor,
+                        onClick = { selectedCategory = ActivityCategory.EXERCISE }
+                    )
+                    CategoryItem(
+                        icon = "💧",
+                        label = "Hydration",
+                        category = ActivityCategory.HYDRATION,
+                        selectedCategory = selectedCategory,
+                        color = HydrationColor,
+                        onClick = { selectedCategory = ActivityCategory.HYDRATION }
+                    )
+                    CategoryItem(
+                        icon = "🍎",
+                        label = "Nutrition",
+                        category = ActivityCategory.NUTRITION,
+                        selectedCategory = selectedCategory,
+                        color = NutritionColor,
+                        onClick = { selectedCategory = ActivityCategory.NUTRITION }
+                    )
+                    CategoryItem(
+                        icon = "😴",
+                        label = "Sleep",
+                        category = ActivityCategory.SLEEP,
+                        selectedCategory = selectedCategory,
+                        color = SleepColor,
+                        onClick = { selectedCategory = ActivityCategory.SLEEP }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Activity Name
+                // Activity Name Dropdown
                 Text(
                     "Activity Name",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = activityName,
-                    onValueChange = { activityName = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("e.g., Morning Jogging") },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryPurple,
-                        unfocusedBorderColor = DividerColor
-                    )
-                )
+                
+                val nameOptions = when(selectedCategory) {
+                    ActivityCategory.EXERCISE -> EXERCISE_OPTIONS
+                    ActivityCategory.HYDRATION -> HYDRATION_OPTIONS
+                    ActivityCategory.NUTRITION -> NUTRITION_OPTIONS
+                    ActivityCategory.SLEEP -> SLEEP_OPTIONS
+                    else -> emptyList()
+                }
+
+                if (nameOptions.isNotEmpty()) {
+                    ExposedDropdownMenuBox(
+                        expanded = expandedName,
+                        onExpandedChange = { expandedName = !expandedName },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = activityName,
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedName) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryPurple,
+                                unfocusedBorderColor = DividerColor
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedName,
+                            onDismissRequest = { expandedName = false }
+                        ) {
+                            nameOptions.forEach { selectionOption ->
+                                DropdownMenuItem(
+                                    text = { Text(selectionOption) },
+                                    onClick = {
+                                        activityName = selectionOption
+                                        expandedName = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Duration
+                // Duration/Volume Field
+                val durationLabel = when(selectedCategory) {
+                    ActivityCategory.HYDRATION -> "Volume (liter)"
+                    ActivityCategory.SLEEP -> "Duration (hours)"
+                    ActivityCategory.NUTRITION -> "Amount / Calorie (approx)"
+                    else -> "Duration (minutes)"
+                }
+                val durationPlaceholder = when(selectedCategory) {
+                    ActivityCategory.HYDRATION -> "e.g., 0.5"
+                    ActivityCategory.SLEEP -> "e.g., 8"
+                    else -> "e.g., 30"
+                }
+                
                 Text(
-                    "Duration (minutes)",
+                    durationLabel,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = duration,
+                    value = durationOrVolume,
                     onValueChange = { newValue ->
-                        duration = newValue.filter { it.isDigit() }
+                        if (newValue.isEmpty() || newValue.matches(Regex("""^\d*\.?\d*$"""))) {
+                            durationOrVolume = newValue
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("e.g., 30") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    placeholder = { Text(durationPlaceholder) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PrimaryPurple,
@@ -267,22 +281,80 @@ fun AddActivityScreen(
                     )
                 )
 
+                if (selectedCategory == ActivityCategory.SLEEP) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Sleep Quality",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ExposedDropdownMenuBox(
+                        expanded = expandedQuality,
+                        onExpandedChange = { expandedQuality = !expandedQuality },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = sleepQuality,
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedQuality) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryPurple,
+                                unfocusedBorderColor = DividerColor
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedQuality,
+                            onDismissRequest = { expandedQuality = false }
+                        ) {
+                            SLEEP_QUALITY_OPTIONS.forEach { selectionOption ->
+                                DropdownMenuItem(
+                                    text = { Text(selectionOption) },
+                                    onClick = {
+                                        sleepQuality = selectionOption
+                                        expandedQuality = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Description
+                // Recommendations & Description
                 Text(
-                    "Description (Optional)",
+                    "Description / Notes",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                
+                // Recommendation helper text
+                val recommendation = when(selectedCategory) {
+                    ActivityCategory.NUTRITION -> "Recommendation: Fill in what you ate (e.g., Brown Rice, Chicken Breast, Broccoli) for better tracking."
+                    ActivityCategory.SLEEP -> {
+                        when(sleepQuality) {
+                            "Kurang (Poor)", "Buruk (Very Poor)" -> "Tip: Try avoiding screens 1 hour before bed and keep your room cool for better quality."
+                            "Sangat Baik (Excellent)" -> "Awesome! Maintain your routine for consistent energy."
+                            else -> "Tip: Consistency is key. Try to sleep and wake up at the same time every day."
+                        }
+                    }
+                    else -> "Add notes about your activity..."
+                }
+
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp),
-                    placeholder = { Text("Add notes about your activity...") },
+                    placeholder = { Text(recommendation) },
                     shape = RoundedCornerShape(12.dp),
                     maxLines = 5,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -294,12 +366,12 @@ fun AddActivityScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Points Preview
-                val durationInt = duration.toIntOrNull() ?: 0
+                val durationValue = durationOrVolume.toDoubleOrNull() ?: 0.0
                 val activityInput = ActivityInput(
                     category = selectedCategory,
                     activityName = activityName,
                     description = description,
-                    duration = durationInt
+                    duration = if (selectedCategory == ActivityCategory.SLEEP) (durationValue * 60).toInt() else durationValue.toInt()
                 )
                 val estimatedPoints = activityInput.calculatePoints()
 
@@ -335,17 +407,22 @@ fun AddActivityScreen(
                 // Save Button
                 Button(
                     onClick = {
-                        if (activityName.isNotBlank() && durationInt > 0) {
+                        if (activityName.isNotBlank() && durationValue > 0) {
                             isLoading = true
+                            // Append sleep quality to description if it's a sleep activity
+                            val finalDescription = if (selectedCategory == ActivityCategory.SLEEP) {
+                                "Quality: $sleepQuality. $description"
+                            } else description
+                            
+                            val finalInput = activityInput.copy(description = finalDescription)
+
                             if (isEditMode && activityId != null) {
-                                // Update existing activity
-                                viewModel.updateActivity(activityId, activityInput) {
+                                viewModel.updateActivity(activityId, finalInput) {
                                     isLoading = false
                                     onNavigateBack()
                                 }
                             } else {
-                                // Add new activity
-                                viewModel.addActivity(activityInput) {
+                                viewModel.addActivity(finalInput) {
                                     isLoading = false
                                     onNavigateBack()
                                 }
@@ -359,7 +436,7 @@ fun AddActivityScreen(
                         containerColor = PrimaryPurple
                     ),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = activityName.isNotBlank() && durationInt > 0 && !isLoading
+                    enabled = activityName.isNotBlank() && durationValue > 0 && !isLoading
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
@@ -378,6 +455,46 @@ fun AddActivityScreen(
 
                 Spacer(modifier = Modifier.height(100.dp))
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RowScope.CategoryItem(
+    icon: String,
+    label: String,
+    category: ActivityCategory,
+    selectedCategory: ActivityCategory,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .weight(1f)
+            .height(100.dp),
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = if (selectedCategory == category)
+                color.copy(alpha = 0.2f) else CardBackground
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(icon, style = MaterialTheme.typography.displaySmall)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (selectedCategory == category)
+                    FontWeight.Bold else FontWeight.Normal
+            )
         }
     }
 }

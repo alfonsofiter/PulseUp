@@ -1,6 +1,8 @@
 package com.pulseup.app
 
 sealed class Screen(val route: String) {
+    object Login : Screen("login")
+    object SignUp : Screen("signup")
     object Dashboard : Screen("dashboard")
     object Activities : Screen("activities")
     object AddActivity : Screen("add_activity")
@@ -9,5 +11,8 @@ sealed class Screen(val route: String) {
     }
     object Leaderboard : Screen("leaderboard")
     object Profile : Screen("profile")
+    object BMICalculator : Screen("bmi_calculator")
+    object EditProfile : Screen("edit_profile")
+    object Settings : Screen("settings")
     object Onboarding : Screen("onboarding")
 }

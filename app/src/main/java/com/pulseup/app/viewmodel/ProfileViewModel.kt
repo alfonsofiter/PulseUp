@@ -3,6 +3,8 @@ package com.pulseup.app.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import com.pulseup.app.data.local.PulseUpDatabase
 import com.pulseup.app.data.local.entity.Achievement
 import com.pulseup.app.data.local.entity.Badge
@@ -14,10 +16,12 @@ import com.pulseup.app.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 data class ProfileState(
     val user: User? = null,
+    val firebaseEmail: String? = null,
     val totalActivities: Int = 0,
     val totalCalories: Int = 0,
     val badges: List<Badge> = emptyList(),
@@ -34,7 +38,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val badgeRepository = BadgeRepository(database.badgeDao())
     private val achievementRepository = AchievementRepository(database.achievementDao())
 
-    private val currentUserId = 1
+    private val auth = Firebase.auth
 
     private val _profileState = MutableStateFlow(ProfileState())
     val profileState: StateFlow<ProfileState> = _profileState.asStateFlow()
@@ -48,96 +52,126 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _profileState.value = _profileState.value.copy(isLoading = true)
 
-            // Load user
-            userRepository.getUserById(currentUserId).collect { user ->
-                user?.let {
-                    // Load statistics
-                    val totalActivities = activityRepository.getTotalActivityCount(currentUserId)
-                    val totalCalories = activityRepository.getTotalCaloriesBurned(currentUserId)
-                    val unlockedCount = achievementRepository.getUniqueBadgeCount(currentUserId)
+            val currentUser = auth.currentUser
+            val email = currentUser?.email
+            val name = currentUser?.displayName ?: "User"
 
-                    // Load badges
-                    badgeRepository.getAllBadges().collect { badgeList ->
-                        // Load achievements
-                        achievementRepository.getAchievementsByUser(currentUserId).collect { achievementList ->
-                            _profileState.value = ProfileState(
-                                user = it,
-                                totalActivities = totalActivities,
-                                totalCalories = totalCalories,
-                                badges = badgeList,
-                                achievements = achievementList,
-                                unlockedBadgeCount = unlockedCount,
-                                isLoading = false
-                            )
-                        }
+            if (email != null) {
+                userRepository.getUserByEmail(email).collect { localUser ->
+                    if (localUser != null) {
+                        fetchUserStats(localUser, email)
+                    } else {
+                        val placeholderUser = User(
+                            username = name,
+                            email = email,
+                            age = 0,
+                            weight = 0f,
+                            height = 0f
+                        )
+                        _profileState.value = ProfileState(
+                            user = placeholderUser,
+                            firebaseEmail = email,
+                            isLoading = false
+                        )
                     }
                 }
+            } else {
+                _profileState.value = _profileState.value.copy(isLoading = false)
             }
         }
     }
 
-    // Update user profile
-    fun updateUserProfile(
+    private suspend fun fetchUserStats(user: User, email: String) {
+        val userId = user.id
+        val totalActivities = activityRepository.getTotalActivityCount(userId)
+        val totalCalories = activityRepository.getTotalCaloriesBurned(userId)
+        val unlockedCount = achievementRepository.getUniqueBadgeCount(userId)
+
+        badgeRepository.getAllBadges().collect { badgeList ->
+            achievementRepository.getAchievementsByUser(userId).collect { achievementList ->
+                _profileState.value = ProfileState(
+                    user = user,
+                    firebaseEmail = email,
+                    totalActivities = totalActivities,
+                    totalCalories = totalCalories,
+                    badges = badgeList,
+                    achievements = achievementList,
+                    unlockedBadgeCount = unlockedCount,
+                    isLoading = false
+                )
+            }
+        }
+    }
+
+    fun updateFullProfile(
         username: String,
-        age: Int,
-        weight: Float,
-        height: Float,
+        phone: String,
+        dob: Long,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
-            val currentUser = userRepository.getCurrentUserOnce()
-            currentUser?.let { user ->
-                val updatedUser = user.copy(
-                    username = username,
-                    age = age,
-                    weight = weight,
-                    height = height
-                )
-                userRepository.updateUser(updatedUser)
+            val email = auth.currentUser?.email
+            if (email != null) {
+                val currentUser = userRepository.getUserByEmail(email).firstOrNull()
+                if (currentUser != null) {
+                    val updatedUser = currentUser.copy(
+                        username = username,
+                        phoneNumber = phone,
+                        dateOfBirth = dob
+                    )
+                    userRepository.updateUser(updatedUser)
+                } else {
+                    // Create new user if not exists
+                    val newUser = User(
+                        username = username,
+                        email = email,
+                        age = 0,
+                        weight = 0f,
+                        height = 0f,
+                        phoneNumber = phone,
+                        dateOfBirth = dob
+                    )
+                    userRepository.insertUser(newUser)
+                }
                 onSuccess()
             }
         }
     }
 
-    // Generate AI tips based on user activity
+    fun logout() {
+        auth.signOut()
+    }
+
     fun generateAITips(): List<String> {
         val state = _profileState.value
         val tips = mutableListOf<String>()
 
         state.user?.let { user ->
-            // Tip based on activity count
             if (state.totalActivities < 10) {
                 tips.add("💡 You're just getting started! Try to log at least 3 activities per day.")
-            } else if (state.totalActivities < 50) {
-                tips.add("💡 Great progress! Keep building your healthy habits.")
             } else {
-                tips.add("💡 Amazing! You're a health champion! Keep up the excellent work.")
+                tips.add("💡 Great progress! Keep building your healthy habits.")
             }
 
-            // Tip based on streak
             if (user.currentStreak >= 7) {
                 tips.add("🔥 Incredible 7-day streak! You're on fire!")
             } else if (user.currentStreak > 0) {
                 tips.add("🔥 You're on a ${user.currentStreak}-day streak. Keep it going!")
-            } else {
-                tips.add("🎯 Start a new streak today! Consistency is key.")
             }
 
-            // Tip based on BMI
-            val bmi = user.calculateBMI()
             val bmiCategory = user.getBMICategory()
-            when (bmiCategory) {
-                "Normal" -> tips.add("✅ Your BMI is in the healthy range. Keep maintaining!")
-                "Underweight" -> tips.add("⚠️ Consider consulting a nutritionist to gain healthy weight.")
-                "Overweight" -> tips.add("💪 Focus on regular exercise and balanced nutrition.")
-                "Obese" -> tips.add("🏃 Start with light exercises and track your progress daily.")
+            if (user.height > 0) {
+                when (bmiCategory) {
+                    "Normal" -> tips.add("✅ Your BMI is in the healthy range. Keep maintaining!")
+                    "Underweight" -> tips.add("⚠️ Consider consulting a nutritionist to gain healthy weight.")
+                    "Overweight" -> tips.add("💪 Focus on regular exercise and balanced nutrition.")
+                }
             }
         }
 
         return tips
     }
 
-    // Refresh profile
     fun refresh() {
         loadProfileData()
     }

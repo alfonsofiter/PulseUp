@@ -15,6 +15,9 @@ class UserRepository(private val userDao: UserDao) {
     // Get user by ID
     fun getUserById(userId: Int): Flow<User?> = userDao.getUserById(userId)
 
+    // Get user by Email
+    fun getUserByEmail(email: String): Flow<User?> = userDao.getUserByEmail(email)
+
     // Insert new user
     suspend fun insertUser(user: User): Long = userDao.insertUser(user)
 
