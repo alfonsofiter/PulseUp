@@ -34,6 +34,11 @@ fun ProfileScreen(
     val state by viewModel.profileState.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
 
+    // Refresh profile saat kembali dari edit screen
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
+
     // Dialog Konfirmasi Logout
     if (showLogoutDialog) {
         AlertDialog(
@@ -115,15 +120,15 @@ fun ProfileScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Nama User Dinamis
+
+                    // Nama User Dinamis - akan update ketika state.user berubah
                     Text(
                         state.user?.username ?: "User",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
-                    
+
                     // Email User Dinamis
                     Text(
                         state.firebaseEmail ?: "user@example.com",
@@ -237,11 +242,11 @@ fun ProfileScreen(
                             color = TextSecondaryLight
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         val bmi = user?.calculateBMI() ?: 0f
                         val bmiFormatted = "%.1f".format(bmi)
                         val category = user?.getBMICategory() ?: "Unknown"
-                        
+
                         Text(
                             "BMI: $bmiFormatted ($category)",
                             style = MaterialTheme.typography.titleMedium,

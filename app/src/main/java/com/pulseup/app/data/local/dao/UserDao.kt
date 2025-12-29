@@ -45,6 +45,8 @@ interface UserDao {
     @Query("UPDATE users SET longestStreak = :streak WHERE id = :userId")
     suspend fun updateLongestStreak(userId: Int, streak: Int)
 
+
+
     // DELETE
     @Delete
     suspend fun deleteUser(user: User)

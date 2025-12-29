@@ -35,14 +35,12 @@ fun EditProfileScreen(
     val user = state.user
     val context = LocalContext.current
 
-    var fullName by remember { mutableStateOf(user?.username ?: "") }
-    var phoneNumber by remember { mutableStateOf(user?.phoneNumber ?: "") }
-    var dobLong by remember { mutableStateOf(user?.dateOfBirth ?: 0L) }
-    
-    val sdf = SimpleDateFormat("dd MMMM yyyy", Locale.getDefault())
-    val dobString = if (dobLong > 0) sdf.format(Date(dobLong)) else "Select Date"
+    // Initialize dengan nilai dari user, dan update ketika user berubah
+    var fullName by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var dobLong by remember { mutableStateOf(0L) }
 
-    // Sync values when user state is loaded
+    // LaunchedEffect yang akan trigger setiap kali user berubah
     LaunchedEffect(user) {
         user?.let {
             fullName = it.username
@@ -50,6 +48,9 @@ fun EditProfileScreen(
             dobLong = it.dateOfBirth
         }
     }
+
+    val sdf = SimpleDateFormat("dd MMMM yyyy", Locale.getDefault())
+    val dobString = if (dobLong > 0) sdf.format(Date(dobLong)) else "Select Date"
 
     Scaffold(
         topBar = {
@@ -73,7 +74,11 @@ fun EditProfileScreen(
                         Text("Save", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPurple, titleContentColor = Color.White, navigationIconContentColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = PrimaryPurple,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
+                )
             )
         }
     ) { paddingValues ->
@@ -135,7 +140,10 @@ fun EditProfileScreen(
                         color = SuccessGreen.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Verified", color = SuccessGreen, style = MaterialTheme.typography.labelSmall)
@@ -161,7 +169,7 @@ fun EditProfileScreen(
             // Date of Birth
             val calendar = Calendar.getInstance()
             if (dobLong > 0) calendar.timeInMillis = dobLong
-            
+
             val datePickerDialog = DatePickerDialog(
                 context,
                 { _, y, m, d ->

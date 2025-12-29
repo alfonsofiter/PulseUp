@@ -1,6 +1,7 @@
 package com.pulseup.app.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.ktx.auth
@@ -11,6 +12,7 @@ import com.pulseup.app.data.local.entity.Badge
 import com.pulseup.app.data.local.entity.User
 import com.pulseup.app.data.repository.AchievementRepository
 import com.pulseup.app.data.repository.BadgeRepository
+import com.pulseup.app.data.repository.FirebaseLeaderboardRepository
 import com.pulseup.app.data.repository.HealthActivityRepository
 import com.pulseup.app.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +39,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val activityRepository = HealthActivityRepository(database.healthActivityDao())
     private val badgeRepository = BadgeRepository(database.badgeDao())
     private val achievementRepository = AchievementRepository(database.achievementDao())
+    private val firebaseRepo = FirebaseLeaderboardRepository() // ← TAMBAH INI
 
     private val auth = Firebase.auth
 
@@ -110,30 +113,68 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
-            val email = auth.currentUser?.email
-            if (email != null) {
-                val currentUser = userRepository.getUserByEmail(email).firstOrNull()
-                if (currentUser != null) {
-                    val updatedUser = currentUser.copy(
-                        username = username,
-                        phoneNumber = phone,
-                        dateOfBirth = dob
-                    )
-                    userRepository.updateUser(updatedUser)
-                } else {
-                    // Create new user if not exists
-                    val newUser = User(
-                        username = username,
-                        email = email,
-                        age = 0,
-                        weight = 0f,
-                        height = 0f,
-                        phoneNumber = phone,
-                        dateOfBirth = dob
-                    )
-                    userRepository.insertUser(newUser)
+            try {
+                val email = auth.currentUser?.email
+                if (email != null) {
+                    val currentUser = userRepository.getUserByEmail(email).firstOrNull()
+                    if (currentUser != null) {
+                        val updatedUser = currentUser.copy(
+                            username = username,
+                            phoneNumber = phone,
+                            dateOfBirth = dob
+                        )
+                        userRepository.updateUser(updatedUser)
+
+                        Log.d("PROFILE", "✅ Profile updated in Room DB")
+
+                        // Sync ke Firebase Leaderboard
+                        firebaseRepo.syncUserToLeaderboard(
+                            userId = updatedUser.id,
+                            username = updatedUser.username,
+                            totalPoints = updatedUser.totalPoints,
+                            level = updatedUser.level,
+                            currentStreak = updatedUser.currentStreak
+                        )
+
+                        Log.d("PROFILE", "✅ Profile synced to Firebase")
+
+                        // Update state langsung (immediate UI update)
+                        _profileState.value = _profileState.value.copy(
+                            user = updatedUser
+                        )
+
+                    } else {
+                        // Create new user if not exists
+                        val newUser = User(
+                            username = username,
+                            email = email,
+                            age = 0,
+                            weight = 0f,
+                            height = 0f,
+                            phoneNumber = phone,
+                            dateOfBirth = dob
+                        )
+                        val userId = userRepository.insertUser(newUser)
+
+                        // Sync to Firebase
+                        firebaseRepo.syncUserToLeaderboard(
+                            userId = userId.toInt(),
+                            username = username,
+                            totalPoints = 0,
+                            level = 1,
+                            currentStreak = 0
+                        )
+
+                        // Update state langsung
+                        _profileState.value = _profileState.value.copy(
+                            user = newUser.copy(id = userId.toInt())
+                        )
+                    }
+
+                    onSuccess()
                 }
-                onSuccess()
+            } catch (e: Exception) {
+                Log.e("PROFILE", "❌ Update profile failed: ${e.message}", e)
             }
         }
     }
