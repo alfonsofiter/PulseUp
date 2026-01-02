@@ -71,4 +71,7 @@ interface HealthActivityDao {
 
     @Query("SELECT COUNT(*) FROM health_activities WHERE userId = :userId AND timestamp >= :startOfDay")
     suspend fun getActivityCountToday(userId: Int, startOfDay: Long): Int
+
+    @Query("SELECT COUNT(*) FROM health_activities WHERE userId = :userId AND timestamp >= :startTime AND timestamp < :endTime")
+    suspend fun getActivityCountBetween(userId: Int, startTime: Long, endTime: Long): Int
 }

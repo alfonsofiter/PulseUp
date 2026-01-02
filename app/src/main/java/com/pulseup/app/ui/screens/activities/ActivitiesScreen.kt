@@ -35,10 +35,15 @@ fun ActivitiesScreen(
     val activities by viewModel.activities.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
+    // Memastikan data dimuat saat layar dibuka
+    LaunchedEffect(Unit) {
+        viewModel.loadActivities()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Activities") },
+                title = { Text("My Activities", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = PrimaryPurple,
                     titleContentColor = Color.White
@@ -65,7 +70,7 @@ fun ActivitiesScreen(
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(vertical = 12.dp, horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(categories) { category ->
@@ -79,7 +84,15 @@ fun ActivitiesScreen(
                         label = { Text(category) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = PrimaryPurple,
-                            selectedLabelColor = Color.White
+                            selectedLabelColor = Color.White,
+                            containerColor = Color.White,
+                            labelColor = TextSecondaryLight
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = if (selectedCategory == category || (selectedCategory == null && category == "All")) 
+                                Color.Transparent else Color.LightGray,
+                            enabled = true,
+                            selected = selectedCategory == category || (selectedCategory == null && category == "All")
                         )
                     )
                 }
@@ -99,15 +112,16 @@ fun ActivitiesScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.History, null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "No activities yet",
-                            style = MaterialTheme.typography.titleLarge,
+                            "No activities found",
+                            style = MaterialTheme.typography.titleMedium,
                             color = TextSecondaryLight
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Tap + to add your first activity",
-                            style = MaterialTheme.typography.bodyMedium,
+                            "Start your journey by adding one!",
+                            style = MaterialTheme.typography.bodySmall,
                             color = TextSecondaryLight
                         )
                     }
@@ -117,7 +131,8 @@ fun ActivitiesScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 100.dp)
                 ) {
                     items(activities) { activity ->
                         ActivityItemCard(
@@ -128,7 +143,6 @@ fun ActivitiesScreen(
                             }
                         )
                     }
-                    item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
             }
         }
@@ -147,7 +161,7 @@ fun ActivityItemCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = CardBackground
+            containerColor = Color.White
         ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(2.dp)
@@ -158,7 +172,7 @@ fun ActivityItemCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Category Icon
+            // Category Icon logic
             val (emoji, categoryColor) = when (activity.category) {
                 ActivityCategory.EXERCISE -> "🏃" to ExerciseColor
                 ActivityCategory.HYDRATION -> "💧" to HydrationColor
@@ -166,27 +180,23 @@ fun ActivityItemCard(
                 ActivityCategory.SLEEP -> "😴" to SleepColor
             }
 
-            Text(
-                text = emoji,
-                style = MaterialTheme.typography.displaySmall,
+            Box(
                 modifier = Modifier
-                    .background(
-                        color = categoryColor.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(12.dp)
-            )
+                    .size(56.dp)
+                    .background(categoryColor.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = emoji, style = MaterialTheme.typography.headlineSmall)
+            }
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Activity Info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = activity.activityName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = activity.category.displayName,
@@ -208,10 +218,9 @@ fun ActivityItemCard(
                 )
             }
 
-            // Menu Button
             Box {
                 IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, "Menu")
+                    Icon(Icons.Default.MoreVert, "Menu", tint = TextSecondaryLight)
                 }
                 DropdownMenu(
                     expanded = showMenu,
@@ -231,19 +240,18 @@ fun ActivityItemCard(
                             showMenu = false
                             showDeleteDialog = true
                         },
-                        leadingIcon = { Icon(Icons.Default.Delete, "Delete") }
+                        leadingIcon = { Icon(Icons.Default.Delete, "Delete", tint = ErrorRed) }
                     )
                 }
             }
         }
     }
 
-    // Delete Confirmation Dialog
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Activity") },
-            text = { Text("Are you sure you want to delete this activity?") },
+            text = { Text("Are you sure you want to remove this activity from your history?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -251,7 +259,7 @@ fun ActivityItemCard(
                         onDelete()
                     }
                 ) {
-                    Text("Delete", color = ErrorRed)
+                    Text("Delete", color = ErrorRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -264,17 +272,16 @@ fun ActivityItemCard(
 }
 
 private fun getTimeAgo(timestamp: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
+    val diff = System.currentTimeMillis() - timestamp
     val seconds = diff / 1000
     val minutes = seconds / 60
     val hours = minutes / 60
     val days = hours / 24
 
     return when {
-        days > 0 -> "$days day${if (days > 1) "s" else ""} ago"
-        hours > 0 -> "$hours hour${if (hours > 1) "s" else ""} ago"
-        minutes > 0 -> "$minutes min${if (minutes > 1) "s" else ""} ago"
+        days > 0 -> "$days d ago"
+        hours > 0 -> "$hours h ago"
+        minutes > 0 -> "$minutes m ago"
         else -> "Just now"
     }
 }

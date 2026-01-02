@@ -106,8 +106,13 @@ dependencies {
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-database-ktx")
-    implementation("com.google.firebase:firebase-auth-ktx") // Added Firebase Auth
+    implementation("com.google.firebase:firebase-auth-ktx")
 
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Image Loading (Coil) - ADDED THIS
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

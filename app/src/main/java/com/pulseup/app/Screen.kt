@@ -14,5 +14,9 @@ sealed class Screen(val route: String) {
     object BMICalculator : Screen("bmi_calculator")
     object EditProfile : Screen("edit_profile")
     object Settings : Screen("settings")
+    object AppTheme : Screen("app_theme")
+    object HealthGoals : Screen("health_goals")
+    object Notifications : Screen("notifications")
+    object HelpSupport : Screen("help_support")
     object Onboarding : Screen("onboarding")
 }

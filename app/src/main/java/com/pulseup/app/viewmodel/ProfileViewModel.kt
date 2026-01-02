@@ -29,7 +29,8 @@ data class ProfileState(
     val badges: List<Badge> = emptyList(),
     val achievements: List<Achievement> = emptyList(),
     val unlockedBadgeCount: Int = 0,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val activityCountToday: Int = 0
 )
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
@@ -39,7 +40,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val activityRepository = HealthActivityRepository(database.healthActivityDao())
     private val badgeRepository = BadgeRepository(database.badgeDao())
     private val achievementRepository = AchievementRepository(database.achievementDao())
-    private val firebaseRepo = FirebaseLeaderboardRepository() // ← TAMBAH INI
+    private val firebaseRepo = FirebaseLeaderboardRepository()
 
     private val auth = Firebase.auth
 
@@ -50,36 +51,16 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         loadProfileData()
     }
 
-    // Load profile data
     fun loadProfileData() {
         viewModelScope.launch {
             _profileState.value = _profileState.value.copy(isLoading = true)
-
-            val currentUser = auth.currentUser
-            val email = currentUser?.email
-            val name = currentUser?.displayName ?: "User"
-
+            val email = auth.currentUser?.email
             if (email != null) {
                 userRepository.getUserByEmail(email).collect { localUser ->
                     if (localUser != null) {
                         fetchUserStats(localUser, email)
-                    } else {
-                        val placeholderUser = User(
-                            username = name,
-                            email = email,
-                            age = 0,
-                            weight = 0f,
-                            height = 0f
-                        )
-                        _profileState.value = ProfileState(
-                            user = placeholderUser,
-                            firebaseEmail = email,
-                            isLoading = false
-                        )
                     }
                 }
-            } else {
-                _profileState.value = _profileState.value.copy(isLoading = false)
             }
         }
     }
@@ -88,6 +69,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val userId = user.id
         val totalActivities = activityRepository.getTotalActivityCount(userId)
         val totalCalories = activityRepository.getTotalCaloriesBurned(userId)
+        val activityToday = activityRepository.getActivityCountToday(userId)
         val unlockedCount = achievementRepository.getUniqueBadgeCount(userId)
 
         badgeRepository.getAllBadges().collect { badgeList ->
@@ -100,120 +82,67 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     badges = badgeList,
                     achievements = achievementList,
                     unlockedBadgeCount = unlockedCount,
+                    activityCountToday = activityToday,
                     isLoading = false
                 )
             }
         }
     }
 
-    fun updateFullProfile(
-        username: String,
-        phone: String,
-        dob: Long,
-        onSuccess: () -> Unit
-    ) {
+    fun generateAITips(): List<AITip> {
+        val state = _profileState.value
+        val tips = mutableListOf<AITip>()
+
+        state.user?.let { user ->
+            val bmi = user.calculateBMI()
+            when {
+                bmi < 18.5 -> tips.add(AITip("💡 BMI Tip", "Your BMI is low. Focus on protein-rich nutrition.", "nutrition"))
+                bmi > 25.0 -> tips.add(AITip("💪 Weight Control", "Focus on cardio exercises.", "exercise"))
+                else -> tips.add(AITip("✅ Healthy BMI", "Great job! Your weight is ideal.", "success"))
+            }
+
+            if (state.activityCountToday == 0) {
+                tips.add(AITip("🚀 Get Moving", "You haven't logged any activity today.", "warning"))
+            }
+
+            if (user.currentStreak > 0) {
+                tips.add(AITip("🔥 Streak", "You are on a ${user.currentStreak}-day streak!", "streak"))
+            }
+        }
+
+        return if (tips.isEmpty()) listOf(AITip("👋 Welcome", "Start logging activities!", "info")) else tips
+    }
+
+    fun logout() {
         viewModelScope.launch {
             try {
                 val email = auth.currentUser?.email
                 if (email != null) {
-                    val currentUser = userRepository.getUserByEmail(email).firstOrNull()
-                    if (currentUser != null) {
-                        val updatedUser = currentUser.copy(
-                            username = username,
-                            phoneNumber = phone,
-                            dateOfBirth = dob
-                        )
-                        userRepository.updateUser(updatedUser)
-
-                        Log.d("PROFILE", "✅ Profile updated in Room DB")
-
-                        // Sync ke Firebase Leaderboard
-                        firebaseRepo.syncUserToLeaderboard(
-                            userId = updatedUser.id,
-                            username = updatedUser.username,
-                            totalPoints = updatedUser.totalPoints,
-                            level = updatedUser.level,
-                            currentStreak = updatedUser.currentStreak
-                        )
-
-                        Log.d("PROFILE", "✅ Profile synced to Firebase")
-
-                        // Update state langsung (immediate UI update)
-                        _profileState.value = _profileState.value.copy(
-                            user = updatedUser
-                        )
-
-                    } else {
-                        // Create new user if not exists
-                        val newUser = User(
-                            username = username,
-                            email = email,
-                            age = 0,
-                            weight = 0f,
-                            height = 0f,
-                            phoneNumber = phone,
-                            dateOfBirth = dob
-                        )
-                        val userId = userRepository.insertUser(newUser)
-
-                        // Sync to Firebase
-                        firebaseRepo.syncUserToLeaderboard(
-                            userId = userId.toInt(),
-                            username = username,
-                            totalPoints = 0,
-                            level = 1,
-                            currentStreak = 0
-                        )
-
-                        // Update state langsung
-                        _profileState.value = _profileState.value.copy(
-                            user = newUser.copy(id = userId.toInt())
-                        )
+                    val user = userRepository.getUserByEmail(email).firstOrNull()
+                    if (user != null) {
+                        firebaseRepo.removeFromLeaderboard(user.id)
                     }
-
-                    onSuccess()
                 }
+                auth.signOut()
             } catch (e: Exception) {
-                Log.e("PROFILE", "❌ Update profile failed: ${e.message}", e)
+                auth.signOut()
             }
         }
     }
 
-    fun logout() {
-        auth.signOut()
-    }
-
-    fun generateAITips(): List<String> {
-        val state = _profileState.value
-        val tips = mutableListOf<String>()
-
-        state.user?.let { user ->
-            if (state.totalActivities < 10) {
-                tips.add("💡 You're just getting started! Try to log at least 3 activities per day.")
-            } else {
-                tips.add("💡 Great progress! Keep building your healthy habits.")
-            }
-
-            if (user.currentStreak >= 7) {
-                tips.add("🔥 Incredible 7-day streak! You're on fire!")
-            } else if (user.currentStreak > 0) {
-                tips.add("🔥 You're on a ${user.currentStreak}-day streak. Keep it going!")
-            }
-
-            val bmiCategory = user.getBMICategory()
-            if (user.height > 0) {
-                when (bmiCategory) {
-                    "Normal" -> tips.add("✅ Your BMI is in the healthy range. Keep maintaining!")
-                    "Underweight" -> tips.add("⚠️ Consider consulting a nutritionist to gain healthy weight.")
-                    "Overweight" -> tips.add("💪 Focus on regular exercise and balanced nutrition.")
-                }
-            }
+    fun updateFullProfile(username: String, phone: String, dob: Long, photoUrl: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val email = auth.currentUser?.email ?: return@launch
+            val currentUser = userRepository.getUserByEmail(email).firstOrNull() ?: return@launch
+            val updatedUser = currentUser.copy(username = username, phoneNumber = phone, dateOfBirth = dob, profilePictureUrl = photoUrl)
+            userRepository.updateUser(updatedUser)
+            firebaseRepo.syncUserToLeaderboard(updatedUser.id, updatedUser.username, updatedUser.totalPoints, updatedUser.level, updatedUser.currentStreak)
+            _profileState.value = _profileState.value.copy(user = updatedUser)
+            onSuccess()
         }
-
-        return tips
     }
 
-    fun refresh() {
-        loadProfileData()
-    }
+    fun refresh() { loadProfileData() }
 }
+
+data class AITip(val title: String, val message: String, val type: String)

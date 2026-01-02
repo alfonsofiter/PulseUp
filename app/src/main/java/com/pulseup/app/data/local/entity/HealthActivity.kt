@@ -40,21 +40,22 @@ data class ActivityInput(
 ) {
     // Hitung poin berdasarkan kategori dan durasi
     fun calculatePoints(): Int {
+        if (duration <= 0) return 0 // Jangan beri poin jika durasi/jumlah belum diisi
+        
         return when (category) {
-            ActivityCategory.EXERCISE -> duration * 2 // 2 poin per menit
-            ActivityCategory.HYDRATION -> 10 // flat 10 poin per gelas
-            ActivityCategory.NUTRITION -> 15 // flat 15 poin per meal sehat
-            ActivityCategory.SLEEP -> if (duration >= 420) 50 else 25 // 50 jika 7+ jam
+            ActivityCategory.EXERCISE -> duration * 2
+            ActivityCategory.HYDRATION -> 10 // flat per entry
+            ActivityCategory.NUTRITION -> 15 // flat per meal
+            ActivityCategory.SLEEP -> if (duration >= 420) 50 else 25 
         }
     }
 
     // Estimasi kalori terbakar
     fun estimateCalories(): Int {
+        if (duration <= 0) return 0
         return when (category) {
-            ActivityCategory.EXERCISE -> duration * 5 // rough estimate
-            ActivityCategory.HYDRATION -> 0
-            ActivityCategory.NUTRITION -> 0
-            ActivityCategory.SLEEP -> 0
+            ActivityCategory.EXERCISE -> duration * 5
+            else -> 0
         }
     }
 }

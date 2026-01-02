@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import com.pulseup.app.ui.components.PulseUpBottomBar
 import com.pulseup.app.ui.screens.activities.ActivitiesScreen
 import com.pulseup.app.ui.screens.activities.AddActivityScreen
@@ -21,16 +24,18 @@ import com.pulseup.app.ui.screens.auth.SignUpScreen
 import com.pulseup.app.ui.screens.bmi.BMICalculatorScreen
 import com.pulseup.app.ui.screens.dashboard.DashboardScreen
 import com.pulseup.app.ui.screens.leaderboard.LeaderboardScreen
-import com.pulseup.app.ui.screens.profile.EditProfileScreen
-import com.pulseup.app.ui.screens.profile.ProfileScreen
-import com.pulseup.app.ui.screens.profile.SettingsScreen
+import com.pulseup.app.ui.screens.profile.*
 import com.pulseup.app.ui.theme.PulseUpTheme
+import com.pulseup.app.viewmodel.ThemeViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            PulseUpTheme {
+            val themeViewModel: ThemeViewModel = viewModel()
+            val isDarkMode by themeViewModel.isDarkMode.collectAsState(initial = false)
+            
+            PulseUpTheme(darkTheme = isDarkMode) {
                 PulseUpApp()
             }
         }
@@ -42,6 +47,15 @@ fun PulseUpApp() {
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+
+    // Check if user is already logged in
+    val startDestination = remember {
+        if (Firebase.auth.currentUser != null) {
+            Screen.Dashboard.route
+        } else {
+            Screen.Login.route
+        }
+    }
 
     val screensWithBottomBar = listOf(
         Screen.Dashboard.route,
@@ -70,7 +84,7 @@ fun PulseUpApp() {
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Login.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(paddingValues)
         ) {
             // Login Screen
@@ -189,6 +203,18 @@ fun PulseUpApp() {
                     },
                     onNavigateToEditProfile = {
                         navController.navigate(Screen.EditProfile.route)
+                    },
+                    onNavigateToHelpSupport = {
+                        navController.navigate(Screen.HelpSupport.route)
+                    },
+                    onNavigateToAppTheme = {
+                        navController.navigate(Screen.AppTheme.route)
+                    },
+                    onNavigateToHealthGoals = {
+                        navController.navigate(Screen.HealthGoals.route)
+                    },
+                    onNavigateToNotifications = {
+                        navController.navigate(Screen.Notifications.route)
                     }
                 )
             }
@@ -196,6 +222,42 @@ fun PulseUpApp() {
             // Edit Profile
             composable(Screen.EditProfile.route) {
                 EditProfileScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            // Help & Support
+            composable(Screen.HelpSupport.route) {
+                HelpSupportScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            // App Theme
+            composable(Screen.AppTheme.route) {
+                AppThemeScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            // Health Goals
+            composable(Screen.HealthGoals.route) {
+                HealthGoalsScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            // Notifications
+            composable(Screen.Notifications.route) {
+                NotificationSettingsScreen(
                     onNavigateBack = {
                         navController.popBackStack()
                     }

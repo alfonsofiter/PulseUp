@@ -23,7 +23,11 @@ import com.pulseup.app.ui.theme.*
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToEditProfile: () -> Unit
+    onNavigateToEditProfile: () -> Unit,
+    onNavigateToHelpSupport: () -> Unit,
+    onNavigateToAppTheme: () -> Unit,
+    onNavigateToHealthGoals: () -> Unit,
+    onNavigateToNotifications: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -68,10 +72,10 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                "Preferences (Coming Soon)",
+                "Preferences",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = TextSecondaryLight,
+                color = PrimaryPurple,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
@@ -79,21 +83,24 @@ fun SettingsScreen(
                 icon = Icons.Default.Notifications,
                 title = "Notifications",
                 subtitle = "Manage your alerts",
-                enabled = false
+                enabled = true,
+                onClick = onNavigateToNotifications
             )
             
             SettingsItem(
                 icon = Icons.Default.TrackChanges,
                 title = "Health Goals",
                 subtitle = "Set your daily targets",
-                enabled = false
+                enabled = true,
+                onClick = onNavigateToHealthGoals
             )
 
             SettingsItem(
                 icon = Icons.Default.Palette,
                 title = "App Theme",
                 subtitle = "Light or Dark mode",
-                enabled = false
+                enabled = true,
+                onClick = onNavigateToAppTheme
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -102,7 +109,7 @@ fun SettingsScreen(
                 "Support",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = TextSecondaryLight,
+                color = PrimaryPurple,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
@@ -110,7 +117,8 @@ fun SettingsScreen(
                 icon = Icons.Default.Help,
                 title = "Help & Support",
                 subtitle = "FAQ and contact us",
-                enabled = false
+                enabled = true,
+                onClick = onNavigateToHelpSupport
             )
         }
     }

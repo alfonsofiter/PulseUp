@@ -8,57 +8,45 @@ import java.util.Calendar
 
 class HealthActivityRepository(private val activityDao: HealthActivityDao) {
 
-    // Get all activities by user
     fun getActivitiesByUser(userId: Int): Flow<List<HealthActivity>> =
         activityDao.getActivitiesByUser(userId)
 
-    // Get activities by category
     fun getActivitiesByCategory(userId: Int, category: ActivityCategory): Flow<List<HealthActivity>> =
         activityDao.getActivitiesByCategory(userId, category)
 
-    // Get recent activities
     fun getRecentActivities(userId: Int, limit: Int): Flow<List<HealthActivity>> =
         activityDao.getRecentActivities(userId, limit)
 
-    // Get activities today
     fun getActivitiesToday(userId: Int): Flow<List<HealthActivity>> {
         val startOfDay = getStartOfDay()
         return activityDao.getActivitiesToday(userId, startOfDay)
     }
 
-    // Get activities this week
     fun getActivitiesThisWeek(userId: Int): Flow<List<HealthActivity>> {
         val startOfWeek = getStartOfWeek()
         return activityDao.getActivitiesThisWeek(userId, startOfWeek)
     }
 
-    // Get activities this month
     fun getActivitiesThisMonth(userId: Int): Flow<List<HealthActivity>> {
         val startOfMonth = getStartOfMonth()
         return activityDao.getActivitiesThisMonth(userId, startOfMonth)
     }
 
-    // Insert activity
     suspend fun insertActivity(activity: HealthActivity): Long =
         activityDao.insertActivity(activity)
 
-    // Update activity
     suspend fun updateActivity(activity: HealthActivity) =
         activityDao.updateActivity(activity)
 
-    // Delete activity
     suspend fun deleteActivity(activity: HealthActivity) =
         activityDao.deleteActivity(activity)
 
-    // Delete activity by ID
     suspend fun deleteActivityById(activityId: Int) =
         activityDao.deleteActivityById(activityId)
 
-    // Get activity by ID
     suspend fun getActivityById(activityId: Int): HealthActivity? =
         activityDao.getActivityById(activityId)
 
-    // Statistics
     suspend fun getTotalActivityCount(userId: Int): Int =
         activityDao.getTotalActivityCount(userId)
 
@@ -81,7 +69,11 @@ class HealthActivityRepository(private val activityDao: HealthActivityDao) {
         return activityDao.getActivityCountToday(userId, startOfDay)
     }
 
-    // Helper functions for time calculations
+    // New method for streak logic
+    suspend fun getActivityCountBetween(userId: Int, startTime: Long, endTime: Long): Int {
+        return activityDao.getActivityCountBetween(userId, startTime, endTime)
+    }
+
     private fun getStartOfDay(): Long {
         val calendar = Calendar.getInstance()
         calendar.set(Calendar.HOUR_OF_DAY, 0)

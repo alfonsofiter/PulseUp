@@ -1,6 +1,9 @@
 package com.pulseup.app.ui.screens.profile
 
 import android.app.DatePickerDialog
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,10 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.pulseup.app.ui.theme.*
 import com.pulseup.app.viewmodel.ProfileViewModel
 import java.text.SimpleDateFormat
@@ -35,17 +41,27 @@ fun EditProfileScreen(
     val user = state.user
     val context = LocalContext.current
 
-    // Initialize dengan nilai dari user, dan update ketika user berubah
     var fullName by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
-    var dobLong by remember { mutableStateOf(0L) }
+    var dobLong by remember { mutableLongStateOf(0L) }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
 
-    // LaunchedEffect yang akan trigger setiap kali user berubah
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            imageUri = uri
+        }
+    }
+
     LaunchedEffect(user) {
         user?.let {
             fullName = it.username
             phoneNumber = it.phoneNumber
             dobLong = it.dateOfBirth
+            if (it.profilePictureUrl.isNotEmpty()) {
+                imageUri = Uri.parse(it.profilePictureUrl)
+            }
         }
     }
 
@@ -58,7 +74,7 @@ fun EditProfileScreen(
                 title = { Text("Edit Profile") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
                 actions = {
@@ -66,7 +82,8 @@ fun EditProfileScreen(
                         viewModel.updateFullProfile(
                             username = fullName,
                             phone = phoneNumber,
-                            dob = dobLong
+                            dob = dobLong,
+                            photoUrl = imageUri?.toString() ?: ""
                         ) {
                             onNavigateBack()
                         }
@@ -97,16 +114,26 @@ fun EditProfileScreen(
                     modifier = Modifier
                         .size(120.dp)
                         .clip(CircleShape)
-                        .background(PrimaryPurple.copy(alpha = 0.1f)),
+                        .background(PrimaryPurple.copy(alpha = 0.1f))
+                        .clickable { photoPickerLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Person, null, modifier = Modifier.size(80.dp), tint = PrimaryPurple)
+                    if (imageUri != null) {
+                        AsyncImage(
+                            model = imageUri,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, null, modifier = Modifier.size(80.dp), tint = PrimaryPurple)
+                    }
                 }
                 Surface(
                     modifier = Modifier.size(36.dp).offset(x = (-4).dp, y = (-4).dp),
                     shape = CircleShape,
                     color = PrimaryPurple,
-                    onClick = { /* Handle Photo Upload */ }
+                    onClick = { photoPickerLauncher.launch("image/*") }
                 ) {
                     Icon(Icons.Default.CameraAlt, null, modifier = Modifier.padding(8.dp), tint = Color.White)
                 }
