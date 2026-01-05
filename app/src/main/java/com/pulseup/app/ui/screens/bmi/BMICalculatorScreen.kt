@@ -29,17 +29,22 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pulseup.app.ui.theme.*
+import com.pulseup.app.viewmodel.ProfileViewModel
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BMICalculatorScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    viewModel: ProfileViewModel = viewModel()
 ) {
+    val state by viewModel.profileState.collectAsState()
+    val user = state.user
+
     var height by remember { mutableStateOf("") }
     var weight by remember { mutableStateOf("") }
     var age by remember { mutableStateOf("") }
@@ -47,7 +52,14 @@ fun BMICalculatorScreen(
     var bmiResult by remember { mutableStateOf<Double?>(null) }
     var showResult by remember { mutableStateOf(false) }
 
-    // Mock History Data
+    LaunchedEffect(user) {
+        if (user != null) {
+            if (height.isEmpty()) height = if(user.height > 0) user.height.toInt().toString() else ""
+            if (weight.isEmpty()) weight = if(user.weight > 0) user.weight.toInt().toString() else ""
+            if (age.isEmpty()) age = if(user.age > 0) user.age.toString() else ""
+        }
+    }
+
     val bmiHistory = remember { listOf(24.5, 25.2, 24.8, 26.1, 25.5, 24.2) }
 
     Scaffold(
@@ -76,7 +88,6 @@ fun BMICalculatorScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Input Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
@@ -143,12 +154,28 @@ fun BMICalculatorScreen(
 
                     Button(
                         onClick = {
-                            val h = height.toDoubleOrNull() ?: 0.0
-                            val w = weight.toDoubleOrNull() ?: 0.0
+                            val h = height.toFloatOrNull() ?: 0f
+                            val w = weight.toFloatOrNull() ?: 0f
+                            val a = age.toIntOrNull() ?: 0
+                            
                             if (h > 0 && w > 0) {
                                 val hMeters = h / 100
-                                bmiResult = w / (hMeters * hMeters)
+                                bmiResult = (w / (hMeters * hMeters)).toDouble()
                                 showResult = true
+                                
+                                // PERBAIKAN: Kirim data h, w, a agar benar-benar tersimpan ke Database
+                                viewModel.updateFullProfile(
+                                    username = user?.username ?: "",
+                                    phone = user?.phoneNumber ?: "",
+                                    dob = user?.dateOfBirth ?: 0L,
+                                    photoUrl = user?.profilePictureUrl ?: "",
+                                    height = h,
+                                    weight = w,
+                                    age = a,
+                                    onSuccess = {
+                                        // Berhasil simpan
+                                    }
+                                )
                             }
                         },
                         modifier = Modifier
@@ -159,14 +186,13 @@ fun BMICalculatorScreen(
                     ) {
                         Icon(Icons.Default.Calculate, null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Calculate BMI", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Calculate & Save BMI", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Result Section with Animation
             AnimatedVisibility(
                 visible = showResult,
                 enter = fadeIn(animationSpec = tween(600)) + expandVertically(animationSpec = tween(600)),
@@ -175,15 +201,11 @@ fun BMICalculatorScreen(
                 bmiResult?.let { bmi ->
                     Column {
                         BMIResultCard(bmi = bmi, heightCm = height.toDoubleOrNull() ?: 0.0)
-                        
                         Spacer(modifier = Modifier.height(24.dp))
-                        
-                        // BMI History Chart
                         BMIHistoryChart(history = bmiHistory)
                     }
                 }
             }
-            
             Spacer(modifier = Modifier.height(80.dp))
         }
     }
@@ -267,7 +289,6 @@ fun BMIResultCard(bmi: Double, heightCm: Double) {
         else -> ErrorRed
     }
 
-    // Ideal Weight Calculation (Hamwi Formula simple)
     val hMeters = heightCm / 100
     val minIdealWeight = (18.5 * hMeters * hMeters).roundToInt()
     val maxIdealWeight = (24.9 * hMeters * hMeters).roundToInt()
@@ -305,7 +326,7 @@ fun BMIResultCard(bmi: Double, heightCm: Double) {
             
             Text(
                 text = bmiFormatted,
-                style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp), // Increased Size
+                style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
                 fontWeight = FontWeight.Black,
                 color = categoryColor
             )
@@ -324,22 +345,9 @@ fun BMIResultCard(bmi: Double, heightCm: Double) {
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
-            // Ideal Weight Range
-            Text(
-                "Ideal weight range for your height:",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondaryLight
-            )
-            Text(
-                "$minIdealWeight - $maxIdealWeight kg",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = SuccessGreen
-            )
-
+            Text("Ideal weight range for your height:", style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+            Text("$minIdealWeight - $maxIdealWeight kg", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SuccessGreen)
             Spacer(modifier = Modifier.height(24.dp))
-
             BMIScale(bmi = bmi)
         }
     }
@@ -357,28 +365,15 @@ fun BMIScale(bmi: Double) {
             Text("40", fontSize = 10.sp, color = TextSecondaryLight)
         }
         Spacer(modifier = Modifier.height(4.dp))
-        
         Box(modifier = Modifier.fillMaxWidth().height(12.dp)) {
             Canvas(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))) {
-                val brush = Brush.horizontalGradient(
-                    colors = listOf(InfoBlue, SuccessGreen, WarningOrange, ErrorRed)
-                )
+                val brush = Brush.horizontalGradient(listOf(InfoBlue, SuccessGreen, WarningOrange, ErrorRed))
                 drawRoundRect(brush = brush)
             }
-            
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val x = size.width * animatedProgress
-                drawCircle(
-                    color = Color.White,
-                    radius = 8.dp.toPx(),
-                    center = Offset(x, size.height / 2),
-                )
-                drawCircle(
-                    color = Color.DarkGray,
-                    radius = 8.dp.toPx(),
-                    center = Offset(x, size.height / 2),
-                    style = Stroke(width = 2.dp.toPx())
-                )
+                drawCircle(color = Color.White, radius = 8.dp.toPx(), center = Offset(x, size.height / 2))
+                drawCircle(color = Color.DarkGray, radius = 8.dp.toPx(), center = Offset(x, size.height / 2), style = Stroke(width = 2.dp.toPx()))
             }
         }
     }
@@ -386,17 +381,8 @@ fun BMIScale(bmi: Double) {
 
 @Composable
 fun BMIHistoryChart(history: List<Double>) {
-    Text(
-        "Weight Progress",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-    )
-    Card(
-        modifier = Modifier.fillMaxWidth().height(180.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceLight)
-    ) {
+    Text("Weight Progress", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp))
+    Card(modifier = Modifier.fillMaxWidth().height(180.dp), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = SurfaceLight)) {
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val width = size.width
@@ -404,40 +390,11 @@ fun BMIHistoryChart(history: List<Double>) {
                 val maxVal = history.maxOrNull() ?: 1.0
                 val minVal = history.minOrNull() ?: 0.0
                 val range = (maxVal - minVal).coerceAtLeast(1.0)
-                
-                val points = history.mapIndexed { index, value ->
-                    Offset(
-                        x = (index * (width / (history.size - 1))),
-                        y = height - ((value - minVal) / range * height).toFloat()
-                    )
-                }
-
-                // Draw Path
-                val path = Path().apply {
-                    moveTo(points.first().x, points.first().y)
-                    points.forEach { lineTo(it.x, it.y) }
-                }
-
-                drawPath(
-                    path = path,
-                    color = PrimaryPurple,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                )
-
-                // Draw Dots
-                points.forEach { 
-                    drawCircle(color = PrimaryPurple, radius = 4.dp.toPx(), center = it)
-                    drawCircle(color = Color.White, radius = 2.dp.toPx(), center = it)
-                }
+                val points = history.mapIndexed { index, value -> Offset(x = (index * (width / (history.size - 1))), y = height - ((value - minVal) / range * height).toFloat()) }
+                val path = Path().apply { moveTo(points.first().x, points.first().y); points.forEach { lineTo(it.x, it.y) } }
+                drawPath(path = path, color = PrimaryPurple, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+                points.forEach { drawCircle(color = PrimaryPurple, radius = 4.dp.toPx(), center = it); drawCircle(color = Color.White, radius = 2.dp.toPx(), center = it) }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun BMICalculatorPreview() {
-    PulseUpTheme {
-        BMICalculatorScreen(onNavigateBack = {})
     }
 }

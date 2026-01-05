@@ -5,8 +5,6 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.pulseup.app.data.local.dao.*
 import com.pulseup.app.data.local.entity.*
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +18,7 @@ import kotlinx.coroutines.launch
         Badge::class,
         Achievement::class
     ],
-    version = 2, // Migrasi ke versi 2 karena ada field baru di User
+    version = 3, // NAIKKAN KE VERSI 3 karena userId di HealthActivity berubah dari Int ke String
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -42,7 +40,7 @@ abstract class PulseUpDatabase : RoomDatabase() {
                     PulseUpDatabase::class.java,
                     "pulseup_database"
                 )
-                    .fallbackToDestructiveMigration() // Cara tercepat untuk development agar tidak foreclose
+                    .fallbackToDestructiveMigration() // Ini akan menghapus data lama dan membuat ulang tabel sesuai skema baru
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
@@ -51,7 +49,11 @@ abstract class PulseUpDatabase : RoomDatabase() {
         }
 
         private class DatabaseCallback : RoomDatabase.Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
+            override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                super.onOpen(db)
+            }
+
+            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 super.onCreate(db)
                 INSTANCE?.let { database ->
                     CoroutineScope(Dispatchers.IO).launch {

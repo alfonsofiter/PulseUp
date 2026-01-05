@@ -5,22 +5,24 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import com.pulseup.app.data.local.PulseUpDatabase
 import com.pulseup.app.data.local.entity.ActivityCategory
 import com.pulseup.app.data.local.entity.ActivityInput
 import com.pulseup.app.data.local.entity.HealthActivity
-import com.pulseup.app.data.local.entity.User
 import com.pulseup.app.data.repository.HealthActivityRepository
 import com.pulseup.app.data.repository.UserRepository
 import com.pulseup.app.data.repository.FirebaseLeaderboardRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 
 class ActivitiesViewModel(application: Application) : AndroidViewModel(application) {
@@ -30,6 +32,7 @@ class ActivitiesViewModel(application: Application) : AndroidViewModel(applicati
     private val userRepository = UserRepository(database.userDao())
     private val firebaseRepo = FirebaseLeaderboardRepository()
     private val auth = Firebase.auth
+    private val db = Firebase.database.reference
 
     private val _activities = MutableStateFlow<List<HealthActivity>>(emptyList())
     val activities: StateFlow<List<HealthActivity>> = _activities.asStateFlow()
@@ -37,212 +40,155 @@ class ActivitiesViewModel(application: Application) : AndroidViewModel(applicati
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _selectedCategory = MutableStateFlow<ActivityCategory?>(null)
-    val selectedCategory: StateFlow<ActivityCategory?> = _selectedCategory.asStateFlow()
+    private var activityJob: Job? = null
 
-    private val _currentUserId = MutableStateFlow<Int?>(null)
+    init { loadActivities() }
 
-    init {
-        loadCurrentUser()
-    }
-
-    private fun loadCurrentUser() {
-        viewModelScope.launch {
-            val email = auth.currentUser?.email
-            if (email != null) {
-                val user = userRepository.getUserByEmail(email).firstOrNull()
-                _currentUserId.value = user?.id
-                user?.id?.let { loadActivities() }
-            }
-        }
-    }
-
-    private suspend fun getCurrentUserId(): Int? {
-        if (_currentUserId.value != null) return _currentUserId.value
-        val email = auth.currentUser?.email ?: return null
-        val user = userRepository.getUserByEmail(email).firstOrNull()
-        _currentUserId.value = user?.id
-        return user?.id
-    }
+    private fun getCurrentFirebaseUid(): String? = auth.currentUser?.uid
 
     fun loadActivities() {
-        viewModelScope.launch {
+        activityJob?.cancel()
+        activityJob = viewModelScope.launch {
             _isLoading.value = true
-            val userId = getCurrentUserId()
-            if (userId != null) {
-                activityRepository.getActivitiesByUser(userId).collect { activityList ->
+            val uid = getCurrentFirebaseUid()
+            if (uid != null) {
+                activityRepository.getActivitiesByUser(uid).collect { activityList ->
                     _activities.value = activityList
                     _isLoading.value = false
                 }
-            } else {
-                _isLoading.value = false
-            }
+            } else { _isLoading.value = false }
         }
     }
 
     fun loadActivitiesByCategory(category: ActivityCategory?) {
-        viewModelScope.launch {
+        activityJob?.cancel()
+        activityJob = viewModelScope.launch {
             _isLoading.value = true
-            _selectedCategory.value = category
-            val userId = getCurrentUserId()
-            if (userId != null) {
-                if (category == null) {
-                    activityRepository.getActivitiesByUser(userId).collect { activityList ->
-                        _activities.value = activityList
-                        _isLoading.value = false
-                    }
-                } else {
-                    activityRepository.getActivitiesByCategory(userId, category).collect { activityList ->
-                        _activities.value = activityList
-                        _isLoading.value = false
-                    }
+            val uid = getCurrentFirebaseUid()
+            if (uid != null) {
+                val flow = if (category == null) activityRepository.getActivitiesByUser(uid) 
+                          else activityRepository.getActivitiesByCategory(uid, category)
+                flow.collect { 
+                    _activities.value = it
+                    _isLoading.value = false 
                 }
-            } else {
-                _isLoading.value = false
             }
         }
     }
+
+    suspend fun getActivityById(activityId: Int): HealthActivity? = activityRepository.getActivityById(activityId)
 
     fun addActivity(input: ActivityInput, onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
-                val userId = getCurrentUserId() ?: return@launch
+                val uid = getCurrentFirebaseUid() ?: return@launch
+                val email = auth.currentUser?.email ?: return@launch
                 
                 val points = input.calculatePoints()
-                val calories = input.estimateCalories()
-
                 val activity = HealthActivity(
-                    userId = userId,
+                    userId = uid,
                     category = input.category,
                     activityName = input.activityName,
                     description = input.description,
                     points = points,
-                    caloriesBurned = calories,
+                    caloriesBurned = input.estimateCalories(),
                     duration = input.duration,
                     timestamp = System.currentTimeMillis()
                 )
 
-                // 1. Simpan aktivitas
                 activityRepository.insertActivity(activity)
+                db.child("activities").child(uid).push().setValue(activity)
                 
-                // 2. Tambah poin
-                userRepository.addPoints(userId, points)
-                
-                // 3. Update Streak (Logika diperbaiki)
-                updateStreakLogic(userId)
-
-                syncToFirebase(userId)
+                userRepository.getUserByEmail(email).firstOrNull()?.let { user ->
+                    val newTotalPoints = user.totalPoints + points
+                    val updatedUser = user.copy(totalPoints = newTotalPoints, level = (newTotalPoints / 500) + 1)
+                    userRepository.updateUser(updatedUser)
+                    updateStreakLogic(user.id, uid)
+                    syncToFirebase(uid, updatedUser)
+                }
                 onSuccess()
-            } catch (e: Exception) {
-                Log.e("ACTIVITIES", "Error adding activity", e)
-            }
-        }
-    }
-
-    private suspend fun updateStreakLogic(userId: Int) {
-        val user = userRepository.getUserById(userId).firstOrNull() ?: return
-        
-        val calendar = Calendar.getInstance()
-        
-        // Waktu awal hari ini (00:00:00)
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        val startOfToday = calendar.timeInMillis
-        
-        // Waktu awal kemarin (00:00:00)
-        calendar.add(Calendar.DAY_OF_YEAR, -1)
-        val startOfYesterday = calendar.timeInMillis
-
-        // Ambil SEMUA aktivitas hari ini untuk dicek apakah ini aktivitas pertama
-        val countToday = activityRepository.getActivityCountToday(userId)
-        
-        // Cek aktivitas kemarin
-        val countYesterday = activityRepository.getActivityCountBetween(userId, startOfYesterday, startOfToday)
-
-        var newStreak = user.currentStreak
-
-        // Jika ini adalah aktivitas PERTAMA hari ini, baru kita update streaknya
-        if (countToday == 1) {
-            if (countYesterday > 0) {
-                // Berhasil lanjut dari kemarin
-                newStreak += 1
-                Log.d("STREAK", "🔥 Streak bertambah jadi: $newStreak")
-            } else {
-                // Kemarin kosong atau streak baru mulai
-                newStreak = 1
-                Log.d("STREAK", "🌱 Streak mulai dari 1")
-            }
-            userRepository.updateStreak(userId, newStreak)
-        } else {
-            Log.d("STREAK", "Aktivitas tambahan hari ini, streak tetap: $newStreak")
+            } catch (e: Exception) { Log.e("ACTIVITIES", "Error adding", e) }
         }
     }
 
     fun updateActivity(activityId: Int, input: ActivityInput, onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
-                val userId = getCurrentUserId() ?: return@launch
-                val existingActivity = activityRepository.getActivityById(activityId)
+                val uid = getCurrentFirebaseUid() ?: return@launch
+                val email = auth.currentUser?.email ?: return@launch
+                val oldActivity = activityRepository.getActivityById(activityId) ?: return@launch
+                val pointsDiff = input.calculatePoints() - oldActivity.points
 
-                existingActivity?.let { old ->
-                    val newPoints = input.calculatePoints()
-                    val newCalories = input.estimateCalories()
-                    val pointsDiff = newPoints - old.points
+                val updatedActivity = oldActivity.copy(
+                    category = input.category,
+                    activityName = input.activityName,
+                    description = input.description,
+                    points = input.calculatePoints(),
+                    caloriesBurned = input.estimateCalories(),
+                    duration = input.duration
+                )
 
-                    val updatedActivity = old.copy(
-                        category = input.category,
-                        activityName = input.activityName,
-                        description = input.description,
-                        points = newPoints,
-                        caloriesBurned = newCalories,
-                        duration = input.duration
-                    )
+                activityRepository.updateActivity(updatedActivity)
+                
+                // Update Firebase
+                val snapshot = db.child("activities").child(uid)
+                    .orderByChild("timestamp")
+                    .equalTo(oldActivity.timestamp.toDouble())
+                    .get().await()
+                
+                snapshot.children.forEach { it.ref.setValue(updatedActivity) }
 
-                    activityRepository.updateActivity(updatedActivity)
-                    if (pointsDiff != 0) {
-                        userRepository.addPoints(userId, pointsDiff)
-                    }
-                    syncToFirebase(userId)
-                    onSuccess()
+                userRepository.getUserByEmail(email).firstOrNull()?.let { user ->
+                    val newPoints = (user.totalPoints + pointsDiff).coerceAtLeast(0)
+                    val updatedUser = user.copy(totalPoints = newPoints, level = (newPoints/500)+1)
+                    userRepository.updateUser(updatedUser)
+                    syncToFirebase(uid, updatedUser)
                 }
-            } catch (e: Exception) {
-                Log.e("ACTIVITIES", "Error updating activity", e)
-            }
+                onSuccess()
+            } catch (e: Exception) { Log.e("ACTIVITIES", "Error updating", e) }
         }
     }
 
     fun deleteActivity(activity: HealthActivity, onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
-                val userId = getCurrentUserId() ?: return@launch
+                val uid = getCurrentFirebaseUid() ?: return@launch
+                val email = auth.currentUser?.email ?: return@launch
                 activityRepository.deleteActivity(activity)
-                userRepository.addPoints(userId, -activity.points)
-                syncToFirebase(userId)
+                
+                val snapshot = db.child("activities").child(uid)
+                    .orderByChild("timestamp")
+                    .equalTo(activity.timestamp.toDouble())
+                    .get().await()
+                snapshot.children.forEach { it.ref.removeValue() }
+
+                userRepository.getUserByEmail(email).firstOrNull()?.let { user ->
+                    val newTotalPoints = (user.totalPoints - activity.points).coerceAtLeast(0)
+                    val updatedUser = user.copy(totalPoints = newTotalPoints, level = (newTotalPoints / 500) + 1)
+                    userRepository.updateUser(updatedUser)
+                    syncToFirebase(uid, updatedUser)
+                }
                 onSuccess()
-            } catch (e: Exception) {
-                Log.e("ACTIVITIES", "Error deleting activity", e)
-            }
+            } catch (e: Exception) { Log.e("ACTIVITIES", "Error deleting", e) }
         }
     }
 
-    private fun syncToFirebase(userId: Int) {
+    private suspend fun updateStreakLogic(localUserId: Int, uid: String) {
+        val user = userRepository.getUserById(localUserId).firstOrNull() ?: return
+        val countToday = activityRepository.getActivityCountToday(uid)
+        if (countToday > 0 && user.currentStreak == 0) {
+            userRepository.updateStreak(localUserId, 1)
+        }
+    }
+
+    private fun syncToFirebase(uid: String, user: com.pulseup.app.data.local.entity.User) {
         viewModelScope.launch(Dispatchers.IO + NonCancellable) {
-            userRepository.getUserById(userId).firstOrNull()?.let { user ->
-                firebaseRepo.syncUserToLeaderboard(
-                    userId = user.id,
-                    username = user.username,
-                    totalPoints = user.totalPoints,
-                    level = user.level,
-                    currentStreak = user.currentStreak
-                )
-            }
+            firebaseRepo.syncUserToLeaderboard(uid, user.username, user.totalPoints, user.level, user.currentStreak)
+            db.child("users").child(uid).updateChildren(mapOf(
+                "totalPoints" to user.totalPoints,
+                "level" to user.level,
+                "currentStreak" to user.currentStreak
+            ))
         }
     }
-
-    suspend fun getActivityById(activityId: Int): HealthActivity? = activityRepository.getActivityById(activityId)
-    suspend fun getTotalActivityCount(): Int = getCurrentUserId()?.let { activityRepository.getTotalActivityCount(it) } ?: 0
-    suspend fun getTotalCaloriesBurned(): Int = getCurrentUserId()?.let { activityRepository.getTotalCaloriesBurned(it) } ?: 0
-    suspend fun getActivityCountToday(): Int = getCurrentUserId()?.let { activityRepository.getActivityCountToday(it) } ?: 0
 }

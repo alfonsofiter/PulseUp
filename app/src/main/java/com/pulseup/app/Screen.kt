@@ -1,6 +1,7 @@
 package com.pulseup.app
 
 sealed class Screen(val route: String) {
+    object Splash : Screen("splash") // Tambahkan ini
     object Login : Screen("login")
     object SignUp : Screen("signup")
     object Dashboard : Screen("dashboard")

@@ -7,17 +7,16 @@ import androidx.room.PrimaryKey
 data class HealthActivity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    val userId: Int,
+    val userId: String, // DIUBAH: Menjadi String (Firebase UID)
     val category: ActivityCategory,
     val activityName: String,
     val description: String = "",
     val points: Int,
     val caloriesBurned: Int = 0,
-    val duration: Int = 0, // dalam menit
+    val duration: Int = 0,
     val timestamp: Long = System.currentTimeMillis()
 )
 
-// Enum untuk kategori aktivitas
 enum class ActivityCategory(val displayName: String, val icon: String, val color: Long) {
     EXERCISE("Olahraga", "🏃", 0xFFFF6B6B),
     HYDRATION("Hidrasi", "💧", 0xFF4ECDC4),
@@ -31,26 +30,22 @@ enum class ActivityCategory(val displayName: String, val icon: String, val color
     }
 }
 
-// Data class untuk form input
 data class ActivityInput(
     val category: ActivityCategory,
     val activityName: String,
     val description: String,
     val duration: Int
 ) {
-    // Hitung poin berdasarkan kategori dan durasi
     fun calculatePoints(): Int {
-        if (duration <= 0) return 0 // Jangan beri poin jika durasi/jumlah belum diisi
-        
+        if (duration <= 0) return 0
         return when (category) {
             ActivityCategory.EXERCISE -> duration * 2
-            ActivityCategory.HYDRATION -> 10 // flat per entry
-            ActivityCategory.NUTRITION -> 15 // flat per meal
+            ActivityCategory.HYDRATION -> 10
+            ActivityCategory.NUTRITION -> 15
             ActivityCategory.SLEEP -> if (duration >= 420) 50 else 25 
         }
     }
 
-    // Estimasi kalori terbakar
     fun estimateCalories(): Int {
         if (duration <= 0) return 0
         return when (category) {

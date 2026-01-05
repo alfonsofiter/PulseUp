@@ -21,20 +21,8 @@ class FirebaseLeaderboardRepository {
     private val database = FirebaseDatabase.getInstance()
     private val leaderboardRef = database.getReference("leaderboard")
 
-    init {
-        val connectedRef = database.getReference(".info/connected")
-        connectedRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) ?: false
-                if (connected) Log.d("FIREBASE", "✅ Connected to Firebase!")
-                else Log.e("FIREBASE", "❌ Disconnected from Firebase!")
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        })
-    }
-
     suspend fun syncUserToLeaderboard(
-        userId: Int,
+        userId: String, // PERBAIKAN: Gunakan String (Firebase UID)
         username: String,
         totalPoints: Int,
         level: Int,
@@ -42,27 +30,18 @@ class FirebaseLeaderboardRepository {
     ) {
         try {
             val userMap = mapOf(
-                "userId" to userId.toString(),
+                "userId" to userId,
                 "username" to username,
                 "totalPoints" to totalPoints,
                 "level" to level,
                 "currentStreak" to currentStreak,
                 "lastUpdate" to ServerValue.TIMESTAMP
             )
-            leaderboardRef.child(userId.toString()).setValue(userMap).await()
+            // Gunakan UID sebagai key agar tidak menimpa user lain
+            leaderboardRef.child(userId).setValue(userMap).await()
             Log.d("FIREBASE", "✅ SYNC SUCCESS for $username")
         } catch (e: Exception) {
             Log.e("FIREBASE", "❌ SYNC FAILED: ${e.message}")
-        }
-    }
-
-    // Fungsi baru untuk menghapus user dari leaderboard
-    suspend fun removeFromLeaderboard(userId: Int) {
-        try {
-            leaderboardRef.child(userId.toString()).removeValue().await()
-            Log.d("FIREBASE", "✅ User $userId removed from leaderboard")
-        } catch (e: Exception) {
-            Log.e("FIREBASE", "❌ Failed to remove user $userId: ${e.message}")
         }
     }
 
@@ -72,21 +51,15 @@ class FirebaseLeaderboardRepository {
                 val users = mutableListOf<LeaderboardUser>()
                 snapshot.children.forEach { child ->
                     try {
-                        val userId = child.child("userId").getValue(String::class.java) ?: ""
-                        val username = child.child("username").getValue(String::class.java) ?: ""
-                        val totalPoints = child.child("totalPoints").getValue(Int::class.java) ?: 0
-                        val level = child.child("level").getValue(Int::class.java) ?: 1
-                        val currentStreak = child.child("currentStreak").getValue(Int::class.java) ?: 0
-                        val lastUpdate = child.child("lastUpdate").getValue(Long::class.java) ?: 0L
-
-                        users.add(LeaderboardUser(userId, username, totalPoints, level, currentStreak, lastUpdate))
+                        val user = child.getValue(LeaderboardUser::class.java)
+                        if (user != null) users.add(user)
                     } catch (e: Exception) {
                         Log.e("FIREBASE", "❌ Parse error: ${e.message}")
                     }
                 }
+                // Urutkan berdasarkan poin terbanyak
                 trySend(users.sortedByDescending { it.totalPoints })
             }
-
             override fun onCancelled(error: DatabaseError) {
                 close(error.toException())
             }

@@ -7,11 +7,11 @@ import androidx.room.PrimaryKey
 data class User(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    val username: String,
-    val email: String,
-    val age: Int,
-    val weight: Float, // dalam kg
-    val height: Float, // dalam cm
+    val username: String = "", // Tambahkan default ""
+    val email: String = "",    // Tambahkan default ""
+    val age: Int = 0,          // Tambahkan default 0
+    val weight: Float = 0f,    // Tambahkan default 0f
+    val height: Float = 0f,    // Tambahkan default 0f
     val phoneNumber: String = "",
     val dateOfBirth: Long = 0L,
     val profilePictureUrl: String = "",
@@ -21,14 +21,12 @@ data class User(
     val longestStreak: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 ) {
-    // Hitung BMI
     fun calculateBMI(): Float {
         if (height == 0f) return 0f
         val heightInMeters = height / 100
         return weight / (heightInMeters * heightInMeters)
     }
 
-    // Status BMI
     fun getBMICategory(): String {
         val bmi = calculateBMI()
         return when {
@@ -39,10 +37,10 @@ data class User(
         }
     }
 
-    // Progress ke level berikutnya
     fun getProgressToNextLevel(): Float {
-        val pointsForNextLevel = level * 500
+        if (totalPoints <= 0) return 0f
         val pointsInCurrentLevel = totalPoints % 500
-        return (pointsInCurrentLevel.toFloat() / 500f)
+        val progress = pointsInCurrentLevel.toFloat() / 500f
+        return progress.coerceIn(0f, 1f)
     }
 }

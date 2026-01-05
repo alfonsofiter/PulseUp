@@ -18,26 +18,24 @@ interface HealthActivityDao {
     @Query("SELECT * FROM health_activities WHERE id = :activityId")
     suspend fun getActivityById(activityId: Int): HealthActivity?
 
+    // DIUBAH: userId menjadi String (Firebase UID)
     @Query("SELECT * FROM health_activities WHERE userId = :userId ORDER BY timestamp DESC")
-    fun getActivitiesByUser(userId: Int): Flow<List<HealthActivity>>
+    fun getActivitiesByUser(userId: String): Flow<List<HealthActivity>>
 
     @Query("SELECT * FROM health_activities WHERE userId = :userId AND category = :category ORDER BY timestamp DESC")
-    fun getActivitiesByCategory(userId: Int, category: ActivityCategory): Flow<List<HealthActivity>>
+    fun getActivitiesByCategory(userId: String, category: ActivityCategory): Flow<List<HealthActivity>>
 
     @Query("SELECT * FROM health_activities WHERE userId = :userId ORDER BY timestamp DESC LIMIT :limit")
-    fun getRecentActivities(userId: Int, limit: Int): Flow<List<HealthActivity>>
+    fun getRecentActivities(userId: String, limit: Int): Flow<List<HealthActivity>>
 
-    // Get activities today
     @Query("SELECT * FROM health_activities WHERE userId = :userId AND timestamp >= :startOfDay ORDER BY timestamp DESC")
-    fun getActivitiesToday(userId: Int, startOfDay: Long): Flow<List<HealthActivity>>
+    fun getActivitiesToday(userId: String, startOfDay: Long): Flow<List<HealthActivity>>
 
-    // Get activities this week
     @Query("SELECT * FROM health_activities WHERE userId = :userId AND timestamp >= :startOfWeek ORDER BY timestamp DESC")
-    fun getActivitiesThisWeek(userId: Int, startOfWeek: Long): Flow<List<HealthActivity>>
+    fun getActivitiesThisWeek(userId: String, startOfWeek: Long): Flow<List<HealthActivity>>
 
-    // Get activities this month
     @Query("SELECT * FROM health_activities WHERE userId = :userId AND timestamp >= :startOfMonth ORDER BY timestamp DESC")
-    fun getActivitiesThisMonth(userId: Int, startOfMonth: Long): Flow<List<HealthActivity>>
+    fun getActivitiesThisMonth(userId: String, startOfMonth: Long): Flow<List<HealthActivity>>
 
     // UPDATE
     @Update
@@ -51,27 +49,27 @@ interface HealthActivityDao {
     suspend fun deleteActivityById(activityId: Int)
 
     @Query("DELETE FROM health_activities WHERE userId = :userId")
-    suspend fun deleteAllActivitiesForUser(userId: Int)
+    suspend fun deleteAllActivitiesForUser(userId: String)
 
     // STATISTICS
     @Query("SELECT COUNT(*) FROM health_activities WHERE userId = :userId")
-    suspend fun getTotalActivityCount(userId: Int): Int
+    suspend fun getTotalActivityCount(userId: String): Int
 
     @Query("SELECT COUNT(*) FROM health_activities WHERE userId = :userId AND category = :category")
-    suspend fun getActivityCountByCategory(userId: Int, category: ActivityCategory): Int
+    suspend fun getActivityCountByCategory(userId: String, category: ActivityCategory): Int
 
     @Query("SELECT SUM(points) FROM health_activities WHERE userId = :userId")
-    suspend fun getTotalPoints(userId: Int): Int
+    suspend fun getTotalPoints(userId: String): Int
 
     @Query("SELECT SUM(caloriesBurned) FROM health_activities WHERE userId = :userId")
-    suspend fun getTotalCaloriesBurned(userId: Int): Int
+    suspend fun getTotalCaloriesBurned(userId: String): Int
 
     @Query("SELECT SUM(points) FROM health_activities WHERE userId = :userId AND timestamp >= :startOfDay")
-    suspend fun getPointsToday(userId: Int, startOfDay: Long): Int
+    suspend fun getPointsToday(userId: String, startOfDay: Long): Int
 
     @Query("SELECT COUNT(*) FROM health_activities WHERE userId = :userId AND timestamp >= :startOfDay")
-    suspend fun getActivityCountToday(userId: Int, startOfDay: Long): Int
+    suspend fun getActivityCountToday(userId: String, startOfDay: Long): Int
 
     @Query("SELECT COUNT(*) FROM health_activities WHERE userId = :userId AND timestamp >= :startTime AND timestamp < :endTime")
-    suspend fun getActivityCountBetween(userId: Int, startTime: Long, endTime: Long): Int
+    suspend fun getActivityCountBetween(userId: String, startTime: Long, endTime: Long): Int
 }

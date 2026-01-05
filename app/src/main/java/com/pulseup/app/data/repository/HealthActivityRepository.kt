@@ -8,26 +8,26 @@ import java.util.Calendar
 
 class HealthActivityRepository(private val activityDao: HealthActivityDao) {
 
-    fun getActivitiesByUser(userId: Int): Flow<List<HealthActivity>> =
+    fun getActivitiesByUser(userId: String): Flow<List<HealthActivity>> =
         activityDao.getActivitiesByUser(userId)
 
-    fun getActivitiesByCategory(userId: Int, category: ActivityCategory): Flow<List<HealthActivity>> =
+    fun getActivitiesByCategory(userId: String, category: ActivityCategory): Flow<List<HealthActivity>> =
         activityDao.getActivitiesByCategory(userId, category)
 
-    fun getRecentActivities(userId: Int, limit: Int): Flow<List<HealthActivity>> =
+    fun getRecentActivities(userId: String, limit: Int): Flow<List<HealthActivity>> =
         activityDao.getRecentActivities(userId, limit)
 
-    fun getActivitiesToday(userId: Int): Flow<List<HealthActivity>> {
+    fun getActivitiesToday(userId: String): Flow<List<HealthActivity>> {
         val startOfDay = getStartOfDay()
         return activityDao.getActivitiesToday(userId, startOfDay)
     }
 
-    fun getActivitiesThisWeek(userId: Int): Flow<List<HealthActivity>> {
+    fun getActivitiesThisWeek(userId: String): Flow<List<HealthActivity>> {
         val startOfWeek = getStartOfWeek()
         return activityDao.getActivitiesThisWeek(userId, startOfWeek)
     }
 
-    fun getActivitiesThisMonth(userId: Int): Flow<List<HealthActivity>> {
+    fun getActivitiesThisMonth(userId: String): Flow<List<HealthActivity>> {
         val startOfMonth = getStartOfMonth()
         return activityDao.getActivitiesThisMonth(userId, startOfMonth)
     }
@@ -47,30 +47,30 @@ class HealthActivityRepository(private val activityDao: HealthActivityDao) {
     suspend fun getActivityById(activityId: Int): HealthActivity? =
         activityDao.getActivityById(activityId)
 
-    suspend fun getTotalActivityCount(userId: Int): Int =
+    suspend fun getTotalActivityCount(userId: String): Int =
         activityDao.getTotalActivityCount(userId)
 
-    suspend fun getActivityCountByCategory(userId: Int, category: ActivityCategory): Int =
+    suspend fun getActivityCountByCategory(userId: String, category: ActivityCategory): Int =
         activityDao.getActivityCountByCategory(userId, category)
 
-    suspend fun getTotalPoints(userId: Int): Int =
+    suspend fun getTotalPoints(userId: String): Int =
         activityDao.getTotalPoints(userId)
 
-    suspend fun getTotalCaloriesBurned(userId: Int): Int =
+    suspend fun getTotalCaloriesBurned(userId: String): Int =
         activityDao.getTotalCaloriesBurned(userId)
 
-    suspend fun getPointsToday(userId: Int): Int {
+    suspend fun getPointsToday(userId: String): Int {
         val startOfDay = getStartOfDay()
         return activityDao.getPointsToday(userId, startOfDay)
     }
 
-    suspend fun getActivityCountToday(userId: Int): Int {
+    suspend fun getActivityCountToday(userId: String): Int {
         val startOfDay = getStartOfDay()
         return activityDao.getActivityCountToday(userId, startOfDay)
     }
 
     // New method for streak logic
-    suspend fun getActivityCountBetween(userId: Int, startTime: Long, endTime: Long): Int {
+    suspend fun getActivityCountBetween(userId: String, startTime: Long, endTime: Long): Int {
         return activityDao.getActivityCountBetween(userId, startTime, endTime)
     }
 

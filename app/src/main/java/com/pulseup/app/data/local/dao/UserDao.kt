@@ -6,11 +6,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UserDao {
-    // CREATE
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: User): Long
 
-    // READ
     @Query("SELECT * FROM users WHERE id = :userId")
     fun getUserById(userId: Int): Flow<User?>
 
@@ -29,11 +27,18 @@ interface UserDao {
     @Query("SELECT * FROM users LIMIT 1")
     suspend fun getCurrentUserOnce(): User?
 
-    // UPDATE
     @Update
     suspend fun updateUser(user: User)
 
-    @Query("UPDATE users SET totalPoints = totalPoints + :points WHERE id = :userId")
+    // PERBAIKAN: Gunakan CASE untuk memastikan poin tidak pernah di bawah 0
+    @Query("""
+        UPDATE users 
+        SET totalPoints = CASE 
+            WHEN (totalPoints + :points) < 0 THEN 0 
+            ELSE (totalPoints + :points) 
+        END 
+        WHERE id = :userId
+    """)
     suspend fun addPoints(userId: Int, points: Int)
 
     @Query("UPDATE users SET level = :level WHERE id = :userId")
@@ -45,19 +50,12 @@ interface UserDao {
     @Query("UPDATE users SET longestStreak = :streak WHERE id = :userId")
     suspend fun updateLongestStreak(userId: Int, streak: Int)
 
-
-
-    // DELETE
     @Delete
     suspend fun deleteUser(user: User)
 
     @Query("DELETE FROM users")
     suspend fun deleteAllUsers()
 
-    // STATISTICS
     @Query("SELECT COUNT(*) FROM users")
     suspend fun getUserCount(): Int
-
-    @Query("SELECT SUM(totalPoints) FROM users")
-    suspend fun getTotalPointsAllUsers(): Int
 }
