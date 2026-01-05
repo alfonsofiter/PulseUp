@@ -23,6 +23,7 @@ import com.pulseup.app.ui.screens.activities.AddActivityScreen
 import com.pulseup.app.ui.screens.auth.LoginScreen
 import com.pulseup.app.ui.screens.auth.SignUpScreen
 import com.pulseup.app.ui.screens.bmi.BMICalculatorScreen
+import com.pulseup.app.ui.screens.chatbot.ChatbotScreen // <-- IMPORT BARU
 import com.pulseup.app.ui.screens.dashboard.DashboardScreen
 import com.pulseup.app.ui.screens.leaderboard.LeaderboardScreen
 import com.pulseup.app.ui.screens.profile.*
@@ -34,14 +35,14 @@ import com.pulseup.app.utils.NotificationWorker
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // JADWALKAN NOTIFIKASI SAAT STARTUP
         NotificationWorker.scheduleNotifications(this)
 
         setContent {
             val themeViewModel: ThemeViewModel = viewModel()
             val isDarkMode by themeViewModel.isDarkMode.collectAsState(initial = false)
-            
+
             PulseUpTheme(darkTheme = isDarkMode) {
                 PulseUpApp()
             }
@@ -158,6 +159,7 @@ fun PulseUpApp() {
                 }
             }
 
+            // --- BAGIAN PROFILE (DIUPDATE) ---
             composable(Screen.Profile.route) {
                 Surface(modifier = Modifier.padding(paddingValues)) {
                     ProfileScreen(
@@ -168,9 +170,19 @@ fun PulseUpApp() {
                             }
                         },
                         onNavigateToBMI = { navController.navigate(Screen.BMICalculator.route) },
-                        onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                        onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                        // TAMBAHAN: Navigasi ke Chatbot saat tombol diklik
+                        onNavigateToChat = { navController.navigate(Screen.Chatbot.route) }
                     )
                 }
+            }
+
+            // --- BAGIAN CHATBOT (DITAMBAHKAN) ---
+            composable(Screen.Chatbot.route) {
+                // Tidak menggunakan Surface/paddingValues agar full screen (chat style)
+                ChatbotScreen(
+                    onNavigateUp = { navController.popBackStack() }
+                )
             }
 
             composable(Screen.Settings.route) {
@@ -186,29 +198,29 @@ fun PulseUpApp() {
                 }
             }
 
-            composable(Screen.EditProfile.route) { 
+            composable(Screen.EditProfile.route) {
                 Surface(modifier = Modifier.padding(paddingValues)) {
-                    EditProfileScreen(onNavigateBack = { navController.popBackStack() }) 
+                    EditProfileScreen(onNavigateBack = { navController.popBackStack() })
                 }
             }
-            composable(Screen.HelpSupport.route) { 
+            composable(Screen.HelpSupport.route) {
                 Surface(modifier = Modifier.padding(paddingValues)) {
-                    HelpSupportScreen(onNavigateBack = { navController.popBackStack() }) 
+                    HelpSupportScreen(onNavigateBack = { navController.popBackStack() })
                 }
             }
-            composable(Screen.AppTheme.route) { 
+            composable(Screen.AppTheme.route) {
                 Surface(modifier = Modifier.padding(paddingValues)) {
-                    AppThemeScreen(onNavigateBack = { navController.popBackStack() }) 
+                    AppThemeScreen(onNavigateBack = { navController.popBackStack() })
                 }
             }
-            composable(Screen.HealthGoals.route) { 
+            composable(Screen.HealthGoals.route) {
                 Surface(modifier = Modifier.padding(paddingValues)) {
-                    HealthGoalsScreen(onNavigateBack = { navController.popBackStack() }) 
+                    HealthGoalsScreen(onNavigateBack = { navController.popBackStack() })
                 }
             }
-            composable(Screen.Notifications.route) { 
+            composable(Screen.Notifications.route) {
                 Surface(modifier = Modifier.padding(paddingValues)) {
-                    NotificationSettingsScreen(onNavigateBack = { navController.popBackStack() }) 
+                    NotificationSettingsScreen(onNavigateBack = { navController.popBackStack() })
                 }
             }
         }

@@ -20,4 +20,7 @@ sealed class Screen(val route: String) {
     object Notifications : Screen("notifications")
     object HelpSupport : Screen("help_support")
     object Onboarding : Screen("onboarding")
+
+    // Rute Baru untuk Chatbot
+    object Chatbot : Screen("chatbot")
 }

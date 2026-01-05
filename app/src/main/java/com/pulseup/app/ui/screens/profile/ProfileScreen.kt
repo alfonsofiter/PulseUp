@@ -1,19 +1,15 @@
 package com.pulseup.app.ui.screens.profile
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,8 +21,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.pulseup.app.ui.components.*
@@ -39,140 +33,15 @@ fun ProfileScreen(
     onLogout: () -> Unit = {},
     onNavigateToBMI: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    onNavigateToChat: () -> Unit = {},
     viewModel: ProfileViewModel = viewModel()
 ) {
     val state by viewModel.profileState.collectAsState()
     val user = state.user
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var showChatBot by remember { mutableStateOf(false) }
-
-    val chatListState = rememberLazyListState()
 
     LaunchedEffect(key1 = true) {
         viewModel.refresh()
-    }
-
-    // Auto-scroll ke pesan terbaru (index 0 dalam mode reverse)
-    LaunchedEffect(state.chatHistory.size) {
-        if (state.chatHistory.isNotEmpty()) {
-            chatListState.animateScrollToItem(0)
-        }
-    }
-
-    if (showChatBot) {
-        Dialog(
-            onDismissRequest = { showChatBot = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            var textInput by remember { mutableStateOf("") }
-            
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                topBar = {
-                    TopAppBar(
-                        title = { Text("Coach AI PulseUp 🤖", fontWeight = FontWeight.Bold) },
-                        navigationIcon = {
-                            IconButton(onClick = { showChatBot = false }) {
-                                Icon(Icons.Default.Close, null)
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPurple, titleContentColor = Color.White, navigationIconContentColor = Color.White)
-                    )
-                },
-                // PINDAHKAN INPUT KE BOTTOM BAR AGAR HEADER TIDAK TERDORONG
-                bottomBar = {
-                    Column(
-                        modifier = Modifier
-                            .background(Color.White)
-                            .navigationBarsPadding()
-                            .imePadding() // Hanya bagian bawah yang terpengaruh keyboard
-                            .padding(16.dp)
-                    ) {
-                        // Suggestions Row
-                        val suggestions = listOf("Bagaimana BMI saya?", "Cara naik level?", "Tips olahraga")
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            items(suggestions) { suggestion ->
-                                AssistChip(
-                                    onClick = { viewModel.sendChatMessage(suggestion) },
-                                    label = { Text(suggestion, fontSize = 11.sp) },
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = AssistChipDefaults.assistChipColors(containerColor = PrimaryPurple.copy(alpha = 0.05f))
-                                )
-                            }
-                        }
-
-                        // Input Row
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(
-                                value = textInput,
-                                onValueChange = { textInput = it },
-                                modifier = Modifier.weight(1f),
-                                placeholder = { Text("Tanya Coach AI...") },
-                                shape = RoundedCornerShape(24.dp),
-                                maxLines = 3
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(
-                                onClick = {
-                                    if (textInput.isNotBlank()) {
-                                        viewModel.sendChatMessage(textInput)
-                                        textInput = ""
-                                    }
-                                },
-                                enabled = !state.isSendingChat,
-                                colors = IconButtonDefaults.iconButtonColors(containerColor = PrimaryPurple, contentColor = Color.White)
-                            ) {
-                                if (state.isSendingChat) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                                } else {
-                                    Icon(Icons.AutoMirrored.Filled.Send, null)
-                                }
-                            }
-                        }
-                    }
-                }
-            ) { innerPadding ->
-                // Area Chat otomatis menyesuaikan ukuran saat keyboard muncul tanpa menggeser Header
-                LazyColumn(
-                    state = chatListState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(vertical = 16.dp),
-                    reverseLayout = true
-                ) {
-                    items(state.chatHistory.asReversed()) { chat ->
-                        val isAI = !chat.isUser
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = if (isAI) Alignment.Start else Alignment.End
-                        ) {
-                            Surface(
-                                color = if (isAI) Color(0xFFF5F5F5) else PrimaryPurple,
-                                shape = RoundedCornerShape(
-                                    topStart = 16.dp,
-                                    topEnd = 16.dp,
-                                    bottomStart = if (isAI) 0.dp else 16.dp,
-                                    bottomEnd = if (isAI) 16.dp else 0.dp
-                                )
-                            ) {
-                                Text(
-                                    text = chat.message,
-                                    modifier = Modifier.padding(12.dp),
-                                    color = if (isAI) Color.Black else Color.White,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     if (showLogoutDialog) {
@@ -224,6 +93,7 @@ fun ProfileScreen(
                 .background(BackgroundLight)
                 .verticalScroll(rememberScrollState())
         ) {
+            // --- HEADER PROFIL ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -265,6 +135,7 @@ fun ProfileScreen(
                 }
             }
 
+            // --- LEVEL CARD ---
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -299,6 +170,7 @@ fun ProfileScreen(
                 }
             }
 
+            // --- STATISTICS ---
             Text(
                 "Statistics",
                 style = MaterialTheme.typography.titleLarge,
@@ -321,6 +193,7 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // --- BMI CALCULATOR CARD ---
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -361,8 +234,9 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // --- AI COACH SECTION ---
             Text(
-                "AI Coach Tips 🤖",
+                "Pulse AI Assistant",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimaryLight,
@@ -375,49 +249,35 @@ fun ProfileScreen(
                     .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                onClick = { showChatBot = true }
+                onClick = onNavigateToChat
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("💡", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = state.aiTip,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextPrimaryLight
+                    Text("🤖", fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Chat dengan Pulse AI",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimaryLight
+                        )
+                        Text(
+                            text = "Tanya tips kesehatan & nutrisi disini!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondaryLight
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Buka Chat",
+                        tint = PrimaryPurple
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                "My Badges",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimaryLight,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(state.badges.size) { index ->
-                    val badge = state.badges[index]
-                    val isUnlocked = state.achievements.any { it.badgeId == badge.id }
-                    BadgeCard(
-                        emoji = badge.icon,
-                        name = badge.name,
-                        description = if (isUnlocked) "Unlocked" else "Locked",
-                        isUnlocked = isUnlocked
-                    )
-                }
-            }
+            // --- BADGES SECTION TELAH DIHAPUS ---
 
             Spacer(modifier = Modifier.height(100.dp))
         }
