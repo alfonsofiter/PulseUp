@@ -18,13 +18,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
+// State ini SUDAH COCOK 100% dengan DashboardScreen.kt Anda
 data class DashboardState(
-    val user: User? = null,
-    val healthScore: Int = 0,
-    val activitiesToday: Int = 0,
-    val pointsToday: Int = 0,
-    val caloriesBurned: Int = 0,
+    val user: User? = null,           // Untuk menampilkan Streak, Level, & Total Poin
+    val healthScore: Int = 0,         // Untuk Card Health Score besar
+    val activitiesToday: Int = 0,     // Untuk StatCard "Activities Today"
+    val pointsToday: Int = 0,         // Untuk StatCard "Points Earned" (Hari ini)
+    val caloriesBurned: Int = 0,      // Untuk StatCard "Calories Burned"
     val isLoading: Boolean = false
 )
 
@@ -47,33 +49,38 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun observeUserData() {
         observationJob?.cancel()
-        
+
         observationJob = viewModelScope.launch {
             val email = auth.currentUser?.email
             val firebaseUid = auth.currentUser?.uid
-            
+
             if (email != null && firebaseUid != null) {
-                // SINKRONISASI REAL-TIME: Combine data User dan data Aktivitas dari Room
-                // Ini memastikan poin 270 dan 2 aktivitas langsung muncul saat data di Room berubah
+                // SINKRONISASI REAL-TIME: Menggabungkan data User & Activity
+                // Setiap kali ada perubahan di Room (tambah/hapus activity), UI langsung update otomatis
                 combine(
                     userRepository.getUserByEmail(email),
                     activityRepository.getActivitiesByUser(firebaseUid)
                 ) { user, activities ->
                     if (user != null) {
-                        val activitiesToday = activities.filter { it.timestamp >= getStartOfDay() }.size
-                        val pointsToday = activities.filter { it.timestamp >= getStartOfDay() }.sumOf { it.points }
-                        val totalCalories = activities.sumOf { it.caloriesBurned }
+                        // Filter aktivitas HANYA hari ini (mulai jam 00:00)
+                        val startOfDay = getStartOfDay()
+                        val todaysActivities = activities.filter { it.timestamp >= startOfDay }
 
+                        val activitiesCountToday = todaysActivities.size
+                        val pointsToday = todaysActivities.sumOf { it.points }
+                        val totalCalories = todaysActivities.sumOf { it.caloriesBurned } // Kalori hari ini saja
+
+                        // Hitung Health Score agar dinamis
                         val healthScore = calculateHealthScore(
-                            activitiesToday = activitiesToday,
+                            activitiesToday = activitiesCountToday,
                             streak = user.currentStreak,
                             level = user.level
                         )
 
                         DashboardState(
-                            user = user,
+                            user = user, // Object user lengkap dikirim ke UI
                             healthScore = healthScore,
-                            activitiesToday = activitiesToday,
+                            activitiesToday = activitiesCountToday,
                             pointsToday = pointsToday,
                             caloriesBurned = totalCalories,
                             isLoading = false
@@ -83,7 +90,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }.collect { state ->
                     _dashboardState.value = state
-                    // Sinkronisasi ke Firebase Leaderboard (Background)
+                    // Sinkronisasi ke Firebase Leaderboard (Background Process)
+                    // Menggunakan NonCancellable agar sync tetap jalan meski user tutup aplikasi
                     state.user?.let { syncToFirebase(firebaseUid, it) }
                 }
             } else {
@@ -93,11 +101,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun getStartOfDay(): Long {
-        val calendar = java.util.Calendar.getInstance()
-        calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
-        calendar.set(java.util.Calendar.MINUTE, 0)
-        calendar.set(java.util.Calendar.SECOND, 0)
-        calendar.set(java.util.Calendar.MILLISECOND, 0)
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
         return calendar.timeInMillis
     }
 
