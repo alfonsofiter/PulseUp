@@ -36,6 +36,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+//        nama kelompok: PulseApp
+//                Syahru Dzaki Muhammad       23523275
+//                Alfonso Fiter Ferdiansyah   23523277
+//                Dhiya Rafid Khairi          23523245
+//                Imaddudin Ibnulhakim        23523237
+
         // JADWALKAN NOTIFIKASI SAAT STARTUP
         NotificationWorker.scheduleNotifications(this)
 
